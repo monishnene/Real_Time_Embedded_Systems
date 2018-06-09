@@ -1,9 +1,9 @@
 
-	common_sources = posix_clock.c				
+	common_sources = bragging_time_calculations.c				
 	
 	common_includes =
 
-	common_flags =	-g \
+	common_flags =	-g \0
 			-O0 \
 			-lpthread\
 			-pthread\
