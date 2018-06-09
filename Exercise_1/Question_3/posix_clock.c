@@ -2,7 +2,7 @@
 /* Function: nanosleep and POSIX 1003.1b RT clock demonstration             */
 /*                                                                          */
 /* Sam Siewert - 02/05/2011                                                 */
-/*                                                                          */
+/*                              					    */
 /****************************************************************************/
 
 #include <pthread.h>
@@ -29,7 +29,6 @@ pthread_t main_thread;
 pthread_attr_t main_sched_attr;
 int rt_max_prio, rt_min_prio, min;
 struct sched_param main_param;
-
 
 void print_scheduler(void)
 {
@@ -158,7 +157,7 @@ void end_delay_test(void)
          sleep_requested.tv_sec, sleep_requested.tv_nsec);
 
   printf("\n");
-  printf("Sleep loop count = %ld\n", sleep_count);
+  printf("Sleep loop count = %d\n", sleep_count);
   printf("RT clock delay error = %ld, nanoseconds = %ld\n", 
          delay_error.tv_sec, delay_error.tv_nsec);
  
