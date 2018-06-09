@@ -10,14 +10,13 @@
 #include <stdio.h>
 #include <sched.h>
 #include <unistd.h>
-#include <time.h>
+#include <sys/time.h>
 #include <syslog.h>
 #include <math.h>
 #include <sys/param.h>
 #define FIB_TIMER_CONFIG /* Used to configure the iterations of
 FIB_TEST */
-#define SYSLOG /* For syslog messages
-*/
+//#define SYSLOG /* For syslog messages*/
 /********************************************************************
  Variable Declarations
 ********************************************************************/
@@ -156,11 +155,9 @@ FIB_TEST(seqIterations,838000 );
 stop = readTOD();
 pthread_getschedparam(testThread10,&policy ,&param);
 #ifdef SYSLOG
-syslog(LOG_KERN |LOG_CRIT, "Thread10 priority = %d and time
-stamp %lf msec\n",param.sched_priority,(double)(stop-start) * 1000);
+syslog(LOG_KERN |LOG_CRIT, "Thread10 priority = %d and timestamp %lf msec\n",param.sched_priority,(double)(stop-start) * 1000);
 #else
-printf("Thread10 priority = %d and time stamp %lf
-msec\n",param.sched_priority,(double)(stop-start) * 1000);
+printf("Thread10 priority = %d and time stamp %lf msec\n",param.sched_priority,(double)(stop-start) * 1000);
 #endif
 }
 #else
@@ -189,11 +186,9 @@ FIB_TEST(seqIterations, 410000);
 stop = readTOD();
 pthread_getschedparam(testThread10,&policy ,&param);
 #ifdef SYSLOG
-syslog(LOG_KERN |LOG_CRIT, "Thread10 priority = %d and time stamp
-%lf msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
+syslog(LOG_KERN |LOG_CRIT, "Thread10 priority = %d and time stamp %lf msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
 #else
-printf("Thread10 priority = %d and time stamp %lf
-msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
+printf("Thread10 priority = %d and time stamp %lf msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
 #endif
 }
 }
@@ -220,11 +215,9 @@ FIB_TEST(seqIterations, 838000);
 stop = readTOD();
 pthread_getschedparam(testThread20,&policy ,&param);
 #ifdef SYSLOG
-syslog(LOG_KERN |LOG_CRIT, "Thread20 priority = %d and time stamp
-%lf msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
+syslog(LOG_KERN |LOG_CRIT, "Thread20 priority = %d and time stamp %lf msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
 #else
-printf("Thread20 priority = %d and time stamp %lf
-msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
+printf("Thread20 priority = %d and time stamp %lf msec\n",param.sched_priority,(double)(stop-start_1) * 1000);
 #endif
 }
 }

@@ -3,7 +3,7 @@
 	common_includes =
 
 	common_flags =	-g \
-			-O0 \
+			-O3 \
 			-lpthread\
 			-pthread \
 			-lrt \
