@@ -9,7 +9,7 @@
 #include <math.h>
 #include <sys/param.h>
 
-//#define FIB_TIMER_CONFIG 
+#define FIB_TIMER_CONFIG 
 /* Used to configure the iterations of
 FIB_TEST */
 
@@ -39,24 +39,24 @@ double readTOD(void);
 double elapsedTOD(double stopTOD,double startTOD);
 void printTOD(double stopTOD,double startTOD);
 
-#define FIB_TEST(seqCnt, iterCnt)      
-for(idx=0; idx < iterCnt; idx++)    
-{                                   
-	while(jdx < seqCnt)
-	{                              
-		if (jdx == 0)
-		{
-			fib = 1;
-		}
-		else
-		{
-			fib0 = fib1;            
-			fib1 = fib;             
-			fib = fib0 + fib1;      
-		}
-		jdx++;                      
-	}                         
-}
+#define FIB_TEST(seqCnt, iterCnt)      \
+for(idx=0; idx < iterCnt; idx++)    \
+{                                   \
+	while(jdx < seqCnt)	\
+	{                              \
+		if (jdx == 0)	\
+		{	\
+			fib = 1;	\
+		}	\
+		else	\
+		{	\
+			fib0 = fib1;	\
+			fib1 = fib;	\
+			fib = fib0 + fib1;	\
+		}	\
+		jdx++;	\
+	}	\
+}	\
 
 double readTOD(void)
 {
@@ -70,9 +70,9 @@ double readTOD(void)
 	else
 	{
 		ft=((double)(((double)tv.tv_sec)+(((double)tv.tv_usec)/1000000.0)));
-}
-	return ft;
 	}
+	return ft;
+}
 
 void elapsedTODPrint(double stopTOD,double startTOD)
 {
@@ -185,7 +185,7 @@ void *Thread10(void *threadid)
 			perror("pthread_setaffinity_np");
 			// Estimate CPU clock rate
 		}
-//start = readTOD();
+		//start = readTOD();
 		//mdelay(10);
 		FIB_TEST(seqIterations,1314000);
 		stop = readTOD();
@@ -193,7 +193,7 @@ void *Thread10(void *threadid)
 		pthread_getschedparam(testThread10,&policy ,&param);
 		#ifdef SYSLOG
 		syslog(LOG_KERN|LOG_CRIT,"Thread10 priority = %d and time stamp%lf msec\n",param.sched_priority,(double)(stop-start_1)*1000);
-#else
+		#else
 		printf("Thread10 priority = %d and time stamp %lfmsec\n",param.sched_priority,(double)(stop-start_1)*1000);
 		#endif
 	}
@@ -239,13 +239,12 @@ int main(int argc,char *argv[])
 	int rc,scope,i;
 	useconds_t t_10,t_20;
 	sem_init(&sem_t10,0,1);
-sem_init(&sem_t20,0,1);
+	sem_init(&sem_t20,0,1);
 	double stop_1=0;
 	t_10=10000;
 	t_20=20000;
 	printf("Before adjustments to scheduling policy:\n");
-print_scheduler();
-
+	print_scheduler();
 	pthread_attr_init(&rt10_sched_attr);
 	pthread_attr_init(&rt20_sched_attr);
 	pthread_attr_init(&main_sched_attr);
@@ -273,7 +272,7 @@ print_scheduler();
 	}
 	printf("After adjustments to scheduling policy:\n");
 	print_scheduler();
-printf("min prio = %d, max prio = %d\n",rt_min_prio,rt_max_prio);
+	printf("min prio = %d, max prio = %d\n",rt_min_prio,rt_max_prio);
 	pthread_attr_getscope(&rt10_sched_attr,&scope);
 	// Check the scope of the POSIX scheduling mechanism
 	//
@@ -286,8 +285,8 @@ printf("min prio = %d, max prio = %d\n",rt_min_prio,rt_max_prio);
 
 
 	pthread_attr_setschedparam(&rt10_sched_attr,&rt10_param);
-pthread_attr_setschedparam(&rt20_sched_attr,&rt20_param);
-pthread_attr_setschedparam(&main_sched_attr,&main_param);
+	pthread_attr_setschedparam(&rt20_sched_attr,&rt20_param);
+	pthread_attr_setschedparam(&main_sched_attr,&main_param);
 	#ifdef FIB_TIMER_CONFIG
 	rc = pthread_create(&testThread10,&rt10_sched_attr,Thread10 ,(void*)0);
 	if(rc)
