@@ -1,10 +1,17 @@
 
-	common_sources = testdigest.c				
-	
-	common_includes =
+	common_sources = testdigest.c\
+			 md5.c \
+			 sha1.c \
+			 crc.c \ 
+			 sha2.c 			
+	common_includes = md5.h \
+			  sha1.h \
+			  crc.h \ 
+			  sha2.h \
+			  config.h 			
 
 	common_flags =	-g \
-			-O0 \
+			-O2 \
 			-lpthread\
 			-pthread\
 			-lrt
