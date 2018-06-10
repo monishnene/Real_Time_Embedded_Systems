@@ -17,7 +17,8 @@ void end_delay_test(void);
 static struct timespec rtclk_interrupt_stop_time = {0, 0};
 static struct timespec rtclk_interrupt_start_time = {0, 0};
 static struct timespec rtclk_interrupt_delta_time = {0, 0};
-static struct timespec context_switching_time[NUM_THREADS] = {0, 0};
+static struct timespec context_switching_stop_time[NUM_THREADS] = {0, 0};
+static struct timespec context_switching_start_time[NUM_THREADS] = {0, 0};
 static struct timespec context_switching_delta_time = {0, 0};
 
 pthread_t main_thread;
@@ -67,7 +68,7 @@ int delta_t(struct timespec *stop, struct timespec *start, struct timespec *delt
 void end_delay_test(void)
 {
   int i=0;
-  long seconds=0,nano_seconds=0,average_seconds=0,average_nano_seconds=0;
+  long seconds=0,nano_seconds=2147483647;
   delta_t(&rtclk_interrupt_stop_time,&rtclk_interrupt_start_time,&rtclk_interrupt_delta_time);
   printf("\n");
   printf("Interrupt Handler start seconds = %ld, nanoseconds = %ld\n", 
@@ -80,16 +81,19 @@ void end_delay_test(void)
          rtclk_interrupt_delta_time.tv_sec, rtclk_interrupt_delta_time.tv_nsec);
   for(i=0;i<NUM_THREADS-1;i++)
   {
-	delta_t(context_switching_time+i+1,context_switching_time+i,&context_switching_delta_time);
-	/*printf("Context switch time %d seconds = %ld, nanoseconds = %ld\n", 
-         i+1,context_switching_delta_time.tv_sec, context_switching_delta_time.tv_nsec);*/
-	seconds+=context_switching_delta_time.tv_sec;
-	nano_seconds+=context_switching_delta_time.tv_nsec;
+	delta_t(context_switching_stop_time+i+1,context_switching_start_time+i,&context_switching_delta_time);
+	if(context_switching_delta_time.tv_sec != 0)
+	{
+		delta_t(context_switching_start_time+i+1,context_switching_stop_time+i,&context_switching_delta_time);	
+	}
+	//printf("Context switch time %d seconds = %ld, nanoseconds = %ld\n", i+1,context_switching_delta_time.tv_sec, context_switching_delta_time.tv_nsec);
+	if(nano_seconds > context_switching_delta_time.tv_nsec)
+	{
+		nano_seconds = context_switching_delta_time.tv_nsec;		
+	}
   }
-  average_seconds = seconds/(NUM_THREADS-1);
-  average_nano_seconds = nano_seconds/(NUM_THREADS-1);	
-  printf("Average Context Switching seconds = %ld, nanoseconds = %ld\n", 
-         average_seconds, average_nano_seconds);
+  printf("Lowest Context Switching seconds = %ld, nanoseconds = %ld\n", 
+         seconds, nano_seconds);
   exit(0);
 }
 
@@ -108,7 +112,7 @@ void *counterThread(void *threadp)
 	clock_gettime(CLOCK_REALTIME, &rtclk_interrupt_stop_time);   
 	first_interrupt=0;
     }
-	clock_gettime(CLOCK_REALTIME, context_switching_time + counter);
+	clock_gettime(CLOCK_REALTIME, context_switching_stop_time + counter);
 	counter++; 
     threadParams_t *threadParams = (threadParams_t *)threadp;
 
@@ -118,6 +122,7 @@ void *counterThread(void *threadp)
     printf("Thread idx=%d, sum[0...%d]=%d\n", 
            threadParams->threadIdx,
            threadParams->threadIdx, sum);
+    clock_gettime(CLOCK_REALTIME, context_switching_start_time + counter);
 }
 
 void print_scheduler(void)
