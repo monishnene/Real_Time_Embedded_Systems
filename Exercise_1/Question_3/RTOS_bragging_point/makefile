@@ -6,7 +6,6 @@
 	common_flags =	-g \
 			-O0 \
 			-lpthread\
-			-pthread\
 			-lrt
 
 	CC=gcc

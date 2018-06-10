@@ -10,12 +10,11 @@
 #include <stdio.h>
 #include <sched.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include <time.h>
 #include <syslog.h>
 #include <math.h>
 #include <sys/param.h>
-#define FIB_TIMER_CONFIG /* Used to configure the iterations of
-FIB_TEST */
+//#define FIB_TIMER_CONFIG /* Used to configure the iterations of FIB_TEST */
 //#define SYSLOG /* For syslog messages*/
 /********************************************************************
  Variable Declarations
@@ -301,8 +300,7 @@ int main (int argc, char *argv[])
  rc = pthread_create(&testThread10, &rt10_sched_attr,Thread10 , (void *)0);
  if (rc)
  {
- printf("ERROR; pthread_create() rc is %d\n", rc); perror(NULL); exit(-
-1);
+ printf("ERROR; pthread_create() rc is %d\n", rc); perror(NULL); exit(-1);
  }
  pthread_join(testThread10,NULL);
  if(pthread_attr_destroy(&rt10_sched_attr) != 0)
@@ -312,6 +310,7 @@ int main (int argc, char *argv[])
 #else
  start_1 = readTOD();
  rc = pthread_create(&testThread10, &rt10_sched_attr,Thread10 , (void *)0);
+
  if (rc)
  {
  printf("ERROR; pthread_create() rc is %d\n", rc); perror(NULL); exit(-1);

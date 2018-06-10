@@ -7,6 +7,7 @@
 			-lpthread\
 			-pthread \
 			-lrt \
+			-lm \
 			-DLINUX
 
 	CC=gcc
