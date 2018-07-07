@@ -1,4 +1,4 @@
-	common_sources=	feasibility_tests.c
+	common_sources=	posix_linux_demo.c
 	
 	common_includes =
 
@@ -21,7 +21,7 @@
 	clean \
 	build 
 
-build:	feasibility_tests.elf	
+build:	posix_linux_demo.elf	
 
 %.elf:%.o
 	$(CC)	$(flags)	$(includes)	-o	$@	$<	

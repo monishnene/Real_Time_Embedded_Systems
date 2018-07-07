@@ -1,4 +1,4 @@
-	common_sources=	feasibility_tests.c
+	common_sources=	satellite.c
 	
 	common_includes =
 
@@ -21,7 +21,7 @@
 	clean \
 	build 
 
-build:	feasibility_tests.elf	
+build:	satellite.elf	
 
 %.elf:%.o
 	$(CC)	$(flags)	$(includes)	-o	$@	$<	

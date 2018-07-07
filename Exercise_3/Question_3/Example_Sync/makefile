@@ -1,7 +1,8 @@
 	common_sources=	pthread3ok.c \
 			deadlock.c \
 			deadlock_timeout.c \
-			pthread3.c
+			pthread3.c \
+			deadlock_modified.c
 	
 	common_includes =
 
@@ -23,7 +24,7 @@
 	clean \
 	build 
 
-build:	pthread3ok.elf	pthread3.elf	deadlock.elf	deadlock_timeout.elf
+build:	pthread3ok.elf	pthread3.elf	deadlock.elf	deadlock_timeout.elf	deadlock_modified.elf
 
 %.elf:%.o
 	$(CC)	$(flags)	$(includes)	-o	$@	$<	

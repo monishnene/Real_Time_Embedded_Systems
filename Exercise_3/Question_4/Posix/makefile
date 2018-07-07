@@ -1,14 +1,12 @@
-	common_sources=	feasibility_tests.c
+	common_sources=	posix_mq.c
 	
 	common_includes =
 
 	common_flags =	-g \
-			-O3 \
+			-O0 \
 			-lpthread\
 			-pthread \
-			-lrt \
-			-lm \
-			-DLINUX
+			-lm 
 
 	CC=gcc
 	flags =	$(common_flags)
@@ -21,10 +19,10 @@
 	clean \
 	build 
 
-build:	feasibility_tests.elf	
+build:	posix_mq.elf	
 
 %.elf:%.o
-	$(CC)	$(flags)	$(includes)	-o	$@	$<	
+	$(CC)	$(flags)	$(includes)	-o	$@	$<	-lrt
 
 %.i:%.c	
 	$(CC)	$(flags)	$(includes)	-S	$<	-o	$@
@@ -33,7 +31,7 @@ build:	feasibility_tests.elf
 	$(CC)	$(flags)	$(includes)	-S	$<	-o	$@
 
 %.o:%.c	
-	$(CC)	$(flags)	$(includes)	-c	$<	-o	$@
+	$(CC)	$(flags)	$(includes)	-c	$<	-o	$@	-lrt
 
 %.o:%.s	
 	$(CC)	$(flags)	$(includes)	-c	$<	-o	$@
