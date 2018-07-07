@@ -4,7 +4,6 @@
 
 	common_flags =	-g \
 			-O0 \
-			-lpthread\
 			-pthread \
 			-lm 
 
