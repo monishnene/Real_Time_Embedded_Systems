@@ -5,9 +5,9 @@
 #include <mqueue.h>
 #include <unistd.h>
 
-#define SNDRCV_MQ "/send_receive_mq"
+#define SNDRCV_MQ "send_receive_mq"
 
-struct mq_attr mq_attr;				
+struct mq_attr mq_attr;
 
 static mqd_t mymq;
 
@@ -15,32 +15,31 @@ pthread_t thread_receive, thread_send;
 
 pthread_attr_t attribute_receive, attribute_send;
 
-struct sched_param parameter_receive, parameter_send;		
-		
+struct sched_param parameter_receive, parameter_send;
 
 void *receiver(void *threadp)
 {
-  char buffer[sizeof(void *)+sizeof(int)];
-  void *buffptr; 
+  char buffer[2*sizeof(void *)+sizeof(int)];
+  void *buffptr;
   int prio;
   int nbytes;
   int count = 0;
   int id;
- 
+
   while(1) {
 
     /* read oldest, highest priority msg from the message queue */
 
-    printf("\nReading %ld bytes\n", sizeof(void *));
-  
-    if((nbytes = mq_receive(mymq, buffer, (size_t)(sizeof(void *)+sizeof(int)), &prio)) == -1)
+    printf("\nReading %ld bytes\n",2*sizeof(void *));
+
+    if((nbytes = mq_receive(mymq, buffer, (size_t)(2*sizeof(void *)+sizeof(int)), &prio)) == -1)
     {
       perror("mq_receive");
     }
     else
     {
-      memcpy(&buffptr, buffer, sizeof(void *));
-      memcpy((void *)&id, &(buffer[sizeof(void *)]), sizeof(int));
+      memcpy(&buffptr, buffer,2*sizeof(void *));
+      memcpy((void *)&id, &(buffer[2*sizeof(void *)]),sizeof(int));
       printf("\nReceive: ptr msg 0x%p received with priority = %d, length = %d, id = %d\n", buffptr, prio, nbytes, id);
 
       printf("\nContents of ptr = \n%s\n", (char *)buffptr);
@@ -50,7 +49,6 @@ void *receiver(void *threadp)
       printf("\nHeap space memory freed\n");
 
     }
-    
   }
 
 }
@@ -59,7 +57,7 @@ static char imagebuff[4096];
 
 void *sender(void *threadp)
 {
-  char buffer[sizeof(void *)+sizeof(int)];
+  char buffer[2*sizeof(void *)+sizeof(int)];
   void *buffptr;
   int prio;
   int nbytes;
@@ -76,10 +74,10 @@ void *sender(void *threadp)
 
     printf("\nSending %ld bytes\n", sizeof(buffptr));
 
-    memcpy(buffer, &buffptr, sizeof(void *));
-    memcpy(&(buffer[sizeof(void *)]), (void *)&id, sizeof(int));
+    memcpy(buffer, &buffptr, 2*sizeof(void *));
+    memcpy(&(buffer[2*sizeof(void *)]), (void *)&id, sizeof(int));
 
-    if((nbytes = mq_send(mymq, buffer, (size_t)(sizeof(void *)+sizeof(int)), 30)) == -1)
+    if((nbytes = mq_send(mymq, buffer, (size_t)(2*sizeof(void *)+sizeof(int)), 30)) == -1)
     {
       perror("mq_send");
     }
@@ -91,7 +89,7 @@ void *sender(void *threadp)
     usleep(3000000);
 
   }
-  
+
 }
 
 static int sid, rid;
@@ -116,7 +114,7 @@ void main()
 
   /* setup common message q attributes */
   mq_attr.mq_maxmsg = 100;
-  mq_attr.mq_msgsize = sizeof(void *)+sizeof(int);
+  mq_attr.mq_msgsize = 2*sizeof(void *)+sizeof(int);
 
   mq_attr.mq_flags = 0;
 
