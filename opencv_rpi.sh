@@ -36,6 +36,7 @@ opencv_rpi_install()
     		-D INSTALL_PYTHON_EXAMPLES=ON \
     		-D OPENCV_EXTRA_MODULES_PATH=~/opencv_contrib-3.1.0/modules \
     		-D BUILD_EXAMPLES=ON ..
+		-D WITH_CUDA=OFF
 	make -j4
 	make clean
 	make
