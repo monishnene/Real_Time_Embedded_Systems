@@ -58,4 +58,4 @@ opencv_rpi_install()
 	rm -rf opencv-3.1.0 opencv_contrib-3.1.0
 }
 
-open_rpi_install
+opencv_rpi_install
