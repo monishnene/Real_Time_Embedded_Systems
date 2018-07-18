@@ -4,8 +4,11 @@
 #include <pthread.h>
 #include <mqueue.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
-#define SNDRCV_MQ	"/send_receive_mq"
+#define SNDRCV_MQ "/send_receive_mq"
 #define BUFFER_SIZE 100
 #define ERROR (-1)
 
