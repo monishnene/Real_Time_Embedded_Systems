@@ -1,4 +1,5 @@
-	common_sources=	capture.cpp
+	common_sources=	capture.cpp \
+			capture_stereo.cpp
 	
 	common_includes =
 		
@@ -21,7 +22,7 @@
 	clean \
 	build 
 
-build:	capture.elf	
+build:	capture.elf	capture_stereo.elf
 
 %.elf:%.o
 	$(CC)	$(flags)	$(includes)	-o	$@	$<	-lrt	`pkg-config --libs opencv`	$(opencv_flags)	
