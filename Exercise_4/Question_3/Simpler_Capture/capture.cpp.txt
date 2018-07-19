@@ -14,18 +14,12 @@
 using namespace cv;
 using namespace std;
 
-#define HRES 640
-#define VRES 480
-
 
 int main( int argc, char** argv )
 {
     cvNamedWindow("Capture Example", CV_WINDOW_AUTOSIZE);
-    CvCapture* capture = cvCreateCameraCapture(1);
+    CvCapture* capture = cvCreateCameraCapture(0);
     IplImage* frame;
-
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
 
     while(1)
     {
