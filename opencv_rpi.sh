@@ -36,8 +36,8 @@ opencv_rpi_install()
     		-D CMAKE_INSTALL_PREFIX=/usr/local \
     		-D INSTALL_PYTHON_EXAMPLES=ON \
     		-D OPENCV_EXTRA_MODULES_PATH=~/opencv_contrib-3.1.0/modules \
-    		-D BUILD_EXAMPLES=ON ..
-		-D WITH_CUDA=OFF
+    		-D BUILD_EXAMPLES=ON \
+		-D WITH_CUDA=OFF ..
 	CONF_SWAPSIZE=1024
 	sudo /etc/init.d/dphys-swapfile restart
 	make -j4
