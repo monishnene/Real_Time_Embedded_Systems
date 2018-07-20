@@ -18,8 +18,8 @@ using namespace std;
 
 
 #define NSEC_PER_SEC (1000000000)
-#define HRES 640
-#define VRES 480
+#define HRES 80
+#define VRES 60
 #define OK (0)
 
 // Transform display window
@@ -102,7 +102,7 @@ void CannyThreshold(int, void*)
 void jitter_difference_start(void)
 {
 	printf("\nCanny interactive transform\n");
-	printf("Resolution 640x480 \n");
+	printf("Resolution 80x60 \n");
   	clock_gettime(CLOCK_REALTIME, &start_time);
 	printf("Transform start seconds = %ld, nanoseconds = %ld\n", 
          start_time.tv_sec, start_time.tv_nsec);
