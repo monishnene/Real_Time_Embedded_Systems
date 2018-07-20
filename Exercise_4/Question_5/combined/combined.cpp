@@ -29,7 +29,7 @@ using namespace std;
 #define HOUGH_ELIPTICAL_DEADLINE 40
 
 // Transform display window
-char timg_window_name[] = "Edge Detector Transform";
+char timg_window_name[] = "Combined Transform";
 
 int lowThreshold=0;
 int const max_lowThreshold = 100;
@@ -37,8 +37,8 @@ int kernel_size = 3;
 int edgeThresh = 1;
 int ratio = 3;
 Mat canny_frame, cdst, timg_gray, timg_grad;
-
 IplImage* frame;
+CvCapture* capture;
 
 pthread_t thread_canny, thread_hough, thread_hough_eliptical;
 
@@ -49,6 +49,7 @@ struct sched_param parameter_canny, parameter_hough, parameter_hough_eliptical;
 typedef struct
 {
 	uint8_t* title;
+	float frames;
 	struct timespec deadline;
 	struct timespec start;
 	struct timespec stop;
@@ -152,16 +153,6 @@ void CannyThreshold(int, void*)
 
 void *canny_func(void *threadp)
 {
-    CvCapture* capture;
-    int dev=0,rc=0;
-
-    namedWindow( timg_window_name, CV_WINDOW_AUTOSIZE );
-    // Create a Trackbar for user to enter threshold
-    createTrackbar( "Min Threshold:", timg_window_name, &lowThreshold, max_lowThreshold, CannyThreshold );
-
-    capture = (CvCapture *)cvCreateCameraCapture(dev);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
     while(1)
     {
 	jitter_difference_start(&canny_time_struct);
@@ -172,7 +163,6 @@ void *canny_func(void *threadp)
 
         CannyThreshold(0, 0);
 	jitter_difference_end(&canny_time_struct);
-        cvShowImage("Capture Example", frame);
 
         char c = cvWaitKey(10);
         if( c == 27 ) break;
@@ -181,29 +171,12 @@ void *canny_func(void *threadp)
 
 void *hough_func(void *threadp)
 {
-    CvCapture* capture;
-    IplImage* frame;
+    
     int dev=0;
     Mat gray, canny_frame, cdst;
     vector<Vec4i> lines;
-
-    capture = (CvCapture *)cvCreateCameraCapture(dev);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
     while(1)
     {
-	
-    CvCapture* capture;
-    int dev=0,rc=0;
-
-    namedWindow( timg_window_name, CV_WINDOW_AUTOSIZE );
-    // Create a Trackbar for user to enter threshold
-    createTrackbar( "Min Threshold:", timg_window_name, &lowThreshold, max_lowThreshold, CannyThreshold );
-
-    capture = (CvCapture *)cvCreateCameraCapture(dev);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
-
 	jitter_difference_start(&hough_time_struct);
         frame=cvQueryFrame(capture);
 
@@ -238,25 +211,15 @@ void *hough_func(void *threadp)
 
 void *hough_eliptical_func(void *threadp)
 {
-   cvNamedWindow("Capture Example", CV_WINDOW_AUTOSIZE);
-    //CvCapture* capture = (CvCapture *)cvCreateCameraCapture(0);
-    //CvCapture* capture = (CvCapture *)cvCreateCameraCapture(argv[1]);
-    CvCapture* capture;
-    IplImage* frame;
     int dev=0;
     Mat gray;
     vector<Vec3f> circles;
-
-    capture = (CvCapture *)cvCreateCameraCapture(dev);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
-
     while(1)
     {
 	jitter_difference_start(&hough_eliptical_time_struct);
         frame=cvQueryFrame(capture);
 
-        Mat mat_frame(frame);
+        /*Mat mat_frame(frame);
         cvtColor(mat_frame, gray, CV_BGR2GRAY);
         GaussianBlur(gray, gray, Size(9,9), 2, 2);
 
@@ -272,8 +235,7 @@ void *hough_eliptical_func(void *threadp)
           circle( mat_frame, center, 3, Scalar(0,255,0), -1, 8, 0 );
           // circle outline
           circle( mat_frame, center, radius, Scalar(0,0,255), 3, 8, 0 );
-        }
-
+        }*/
      
         if(!frame) break;
 	jitter_difference_end(&hough_eliptical_time_struct);
@@ -288,14 +250,26 @@ void *hough_eliptical_func(void *threadp)
 
 int main( int argc, char** argv )
 {
+    int thread_no = 0, dev = 0, rc = 0;
+     if(argc > 1)
+    {
+        sscanf(argv[1], "%d", &dev);
+        printf("using %s\n", argv[1]);
+    }
+    else if(argc == 1)
+        printf("using default\n");
 
-   cvNamedWindow("Capture Example", CV_WINDOW_AUTOSIZE);
-    //CvCapture* capture = (CvCapture *)cvCreateCameraCapture(0);
-    //CvCapture* capture = (CvCapture *)cvCreateCameraCapture(argv[1]);
-    CvCapture* capture;
-    IplImage* frame;
-    int dev=0,thread_no=0,rc=0;
-	
+    else
+    {
+        printf("usage: capture [dev]\n");
+        exit(-1);
+    }
+    cvNamedWindow("Combined", CV_WINDOW_AUTOSIZE);
+    // Create a Trackbar for user to enter threshold
+    createTrackbar( "Min Threshold:", timg_window_name, &lowThreshold, max_lowThreshold, CannyThreshold ); 
+    capture = (CvCapture *)cvCreateCameraCapture(dev);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
     if(argc > 1)
     {
         sscanf(argv[1], "%d", &dev);
