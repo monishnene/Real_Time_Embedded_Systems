@@ -39,6 +39,8 @@ int ratio = 3;
 Mat canny_frame, cdst, timg_gray, timg_grad;
 IplImage* frame;
 CvCapture* capture;
+int horizontal = HRES, vertical = VRES;
+double fps = 0;
 
 pthread_t thread_canny, thread_hough, thread_hough_eliptical;
 
@@ -108,14 +110,17 @@ void jitter_difference_end(measured_time * timeptr)
 	
 	delta_t(&(timeptr->stop),&(timeptr->start), &(timeptr->difference));
 	
-	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));
+	fps = 1/(timeptr->difference.tv_sec+double(timeptr->difference.tv_nsec/NSEC_PER_SEC));
+
+	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));	
+
 	return;
 }
 
 void print_time_logs(measured_time * timeptr)
 {
 	printf("%s",timeptr->title);
-	//printf("Resolution %dx%d"HRES,VRES);
+	//printf("Resolution %d x %d"&horizontal,&vertical);
 	
 	printf("Transform start seconds = %ld, nanoseconds = %ld\n", 
         timeptr->start.tv_sec, timeptr->start.tv_nsec);
@@ -125,6 +130,8 @@ void print_time_logs(measured_time * timeptr)
 
 	printf("Transform time required seconds = %ld, nanoseconds = %ld\n", 
         timeptr->difference.tv_sec, timeptr->difference.tv_nsec);
+
+	printf("Frames per second = %f\n", fps);
 
 	printf("Jitter seconds = %ld, nanoseconds = %ld\n", 
         timeptr->jitter.tv_sec, timeptr->jitter.tv_nsec);

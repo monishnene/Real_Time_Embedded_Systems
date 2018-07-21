@@ -7,7 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
-#include <time.h>
+#include <string.h>
+#include <pthread.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -16,14 +17,16 @@
 using namespace cv;
 using namespace std;
 
-
-#define NSEC_PER_SEC (1000000000)
-#define HRES 80
-#define VRES 60
 #define OK (0)
+#define NSEC_PER_SEC 1000000000
+#define NSEC_PER_MSEC 1000000
+#define HRES 1280
+#define VRES 960
+#define MAX_PRIORITY 100
+#define CANNY_DEADLINE 20
 
 // Transform display window
-char timg_window_name[] = "Edge Detector Transform";
+char timg_window_name[] = "Canny Interactive Transform";
 
 int lowThreshold=0;
 int const max_lowThreshold = 100;
@@ -31,17 +34,29 @@ int kernel_size = 3;
 int edgeThresh = 1;
 int ratio = 3;
 Mat canny_frame, cdst, timg_gray, timg_grad;
-
 IplImage* frame;
+CvCapture* capture;
+int horizontal = HRES, vertical = VRES;
+double fps = 0;
 
-static struct timespec start_time;
-static struct timespec stop_time;
-static struct timespec difference;
-static struct timespec max_diff;
-static struct timespec min_diff;
-static struct timespec jitter;
-static struct timespec temp;
- 
+pthread_t thread_canny;
+
+pthread_attr_t attribute_canny;
+
+struct sched_param parameter_canny;
+
+typedef struct
+{
+	uint8_t* title;
+	float frames;
+	struct timespec deadline;
+	struct timespec start;
+	struct timespec stop;
+	struct timespec difference;
+	struct timespec jitter;
+}measured_time;
+
+static measured_time canny_time_struct;
 
 int delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t)
 {
@@ -78,6 +93,45 @@ int delta_t(struct timespec *stop, struct timespec *start, struct timespec *delt
   return(OK);
 }
 
+
+void jitter_difference_start(measured_time * timeptr)
+{
+  	clock_gettime(CLOCK_REALTIME, &(timeptr->start));
+}
+
+void jitter_difference_end(measured_time * timeptr)
+{
+  	clock_gettime(CLOCK_REALTIME, &(timeptr->stop));
+	
+	delta_t(&(timeptr->stop),&(timeptr->start), &(timeptr->difference));
+	
+	fps = 1/(timeptr->difference.tv_sec+double(timeptr->difference.tv_nsec/NSEC_PER_SEC));
+
+	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));	
+
+	return;
+}
+
+void print_time_logs(measured_time * timeptr)
+{
+	printf("%s",timeptr->title);
+	//printf("Resolution %d x %d"&horizontal,&vertical);
+	
+	printf("Transform start seconds = %ld, nanoseconds = %ld\n", 
+        timeptr->start.tv_sec, timeptr->start.tv_nsec);
+
+	printf("Transform stop seconds = %ld, nanoseconds = %ld\n", 
+        timeptr->stop.tv_sec, timeptr->stop.tv_nsec);
+
+	printf("Transform time required seconds = %ld, nanoseconds = %ld\n", 
+        timeptr->difference.tv_sec, timeptr->difference.tv_nsec);
+
+	printf("Frames per second = %f\n", fps);
+
+	printf("Jitter seconds = %ld, nanoseconds = %ld\n", 
+        timeptr->jitter.tv_sec, timeptr->jitter.tv_nsec);
+}
+
 void CannyThreshold(int, void*)
 {
     Mat mat_frame(frame);
@@ -99,52 +153,46 @@ void CannyThreshold(int, void*)
 
 }
 
-void jitter_difference_start(void)
+void *canny_func(void *threadp)
 {
-	printf("\nCanny interactive transform\n");
-	printf("Resolution 80x60 \n");
-  	clock_gettime(CLOCK_REALTIME, &start_time);
-	printf("Transform start seconds = %ld, nanoseconds = %ld\n", 
-         start_time.tv_sec, start_time.tv_nsec);
+    while(1)
+    {
+	jitter_difference_start(&canny_time_struct);
+        frame=cvQueryFrame(capture);
+        if(!frame) break;
+	jitter_difference_end(&canny_time_struct);
+	print_time_logs(&canny_time_struct);
+
+        CannyThreshold(0, 0);
+	jitter_difference_end(&canny_time_struct);
+
+        char c = cvWaitKey(10);
+        if( c == 27 ) break;
+    }
 }
-
-void jitter_difference_end(void)
-{
-	
-  	clock_gettime(CLOCK_REALTIME, &stop_time);
-	printf("Transform stop seconds = %ld, nanoseconds = %ld\n", 
-         stop_time.tv_sec, stop_time.tv_nsec);
-
-	delta_t(&stop_time, &start_time, &difference);
-	printf("Transform time required seconds = %ld, nanoseconds = %ld\n", 
-        difference.tv_sec, difference.tv_nsec);
-
-	delta_t(&difference, &min_diff, &temp);
-	if(temp.tv_sec < 0)
-	{
-		min_diff.tv_sec = difference.tv_sec;
-		min_diff.tv_nsec = difference.tv_nsec;
-	}
-	
-	delta_t(&max_diff, &difference, &temp);
-	if(temp.tv_sec < 0)
-	{
-		max_diff.tv_sec = difference.tv_sec;
-		max_diff.tv_nsec = difference.tv_nsec;
-	}
-
-	delta_t(&max_diff, &min_diff, &jitter);
-	printf("Jitter seconds = %ld, nanoseconds = %ld\n", 
-        jitter.tv_sec, jitter.tv_nsec);
-
-	return;
-}
-
 
 int main( int argc, char** argv )
 {
-    CvCapture* capture;
-    int dev=0,rc=0;
+    int thread_no = 0, dev = 0, rc = 0;
+     if(argc > 1)
+    {
+        sscanf(argv[1], "%d", &dev);
+        printf("using %s\n", argv[1]);
+    }
+    else if(argc == 1)
+        printf("using default\n");
+
+    else
+    {
+        printf("usage: capture [dev]\n");
+        exit(-1);
+    }
+    cvNamedWindow("Combined", CV_WINDOW_AUTOSIZE);
+    // Create a Trackbar for user to enter threshold
+    createTrackbar( "Min Threshold:", timg_window_name, &lowThreshold, max_lowThreshold, CannyThreshold ); 
+    capture = (CvCapture *)cvCreateCameraCapture(dev);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
     if(argc > 1)
     {
         sscanf(argv[1], "%d", &dev);
@@ -158,32 +206,24 @@ int main( int argc, char** argv )
         printf("usage: capture [dev]\n");
         exit(-1);
     }
+    uint8_t canny_title[]="\nCanny Interactive Transform\n";=
+    canny_time_struct.title=canny_title;]
+    canny_time_struct.deadline.tv_nsec=CANNY_DEADLINE*NSEC_PER_MSEC;
 
-    namedWindow( timg_window_name, CV_WINDOW_AUTOSIZE );
-    // Create a Trackbar for user to enter threshold
-    createTrackbar( "Min Threshold:", timg_window_name, &lowThreshold, max_lowThreshold, CannyThreshold );
+   	rc=pthread_attr_init(&attribute_canny);
+  	rc=pthread_attr_setinheritsched(&attribute_canny, PTHREAD_EXPLICIT_SCHED);
+  	rc=pthread_attr_setschedpolicy(&attribute_canny, SCHED_FIFO);
+  	parameter_canny.sched_priority=MAX_PRIORITY-thread_no;
+	thread_no++;
+  	pthread_attr_setschedparam(&attribute_canny, &parameter_canny);
 
-    capture = (CvCapture *)cvCreateCameraCapture(dev);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
-    min_diff.tv_sec = 1600000000;
-    while(1)
-    {
-	jitter_difference_start();
-        frame=cvQueryFrame(capture);
-        if(!frame) break;
-	jitter_difference_end();
+	if(pthread_create(&thread_canny, &attribute_canny, canny_func, NULL)==0)
+		printf("\n\rcanny thread created\n\r");
+  	else perror("\n\rcanny thread creation failed\n\r");
 
-        CannyThreshold(0, 0);
-
-        char q = cvWaitKey(33);
-        if( q == 'q' )
-        {
-            printf("got quit\n"); 
-            break;
-        }
-    }
+  	pthread_join(thread_canny, NULL);
 
     cvReleaseCapture(&capture);
+    cvDestroyWindow("Capture Example");
     
 };
