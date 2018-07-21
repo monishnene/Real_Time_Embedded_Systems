@@ -1,16 +1,15 @@
 /*
  *
- *  Example by Monish Nene
+ *  Example by Sam Siewert 
  *
  */
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
-#include <time.h>
-#include <sys/param.h>
+#include <string.h>
 #include <pthread.h>
-#include <semaphore.h>
+#include <mqueue.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -24,34 +23,30 @@ using namespace std;
 #define NSEC_PER_MSEC 1000000
 #define HRES 1280
 #define VRES 960
+#define MAX_PRIORITY 100
 #define CANNY_DEADLINE 20
 #define HOUGH_DEADLINE 30
 #define HOUGH_ELIPTICAL_DEADLINE 40
 
-sem_t sem_canny, sem_hough, sem_hough_eliptical;
-
+// Transform display window
 char timg_window_name[] = "Combined Transform";
 
-int lowThreshold = 0;
+int lowThreshold=0;
 int const max_lowThreshold = 100;
 int kernel_size = 3;
 int edgeThresh = 1;
 int ratio = 3;
-Mat canny_frame,cdst, timg_gray, timg_grad;
-
-IplImage* frame_canny;
-IplImage* frame_hough;
-IplImage* frame_hough_eliptical;
-
+Mat canny_frame, cdst, timg_gray, timg_grad;
+IplImage* frame;
 CvCapture* capture;
 int horizontal = HRES, vertical = VRES;
 double fps = 0;
 
-pthread_t thread_canny, thread_hough, thread_hough_elipticaltical;
+pthread_t thread_canny, thread_hough, thread_hough_eliptical;
 
-pthread_attr_t attribute_main, attribute_canny, attribute_hough, attribute_hough_eliptical;
+pthread_attr_t attribute_canny, attribute_hough, attribute_hough_eliptical;
 
-struct sched_param parameter_main, parameter_scheduler, parameter_canny, parameter_hough, parameter_hough_eliptical;
+struct sched_param parameter_canny, parameter_hough, parameter_hough_eliptical;
 
 typedef struct
 {
@@ -112,12 +107,12 @@ void jitter_difference_start(measured_time * timeptr)
 void jitter_difference_end(measured_time * timeptr)
 {
   	clock_gettime(CLOCK_REALTIME, &(timeptr->stop));
-
+	
 	delta_t(&(timeptr->stop),&(timeptr->start), &(timeptr->difference));
-
+	
 	fps = 1/(timeptr->difference.tv_sec+double(timeptr->difference.tv_nsec/NSEC_PER_SEC));
 
-	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));
+	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));	
 
 	return;
 }
@@ -125,43 +120,49 @@ void jitter_difference_end(measured_time * timeptr)
 void print_time_logs(measured_time * timeptr)
 {
 	printf("%s",timeptr->title);
-	printf("Resolution %d x %d\n"&horizontal,&vertical);
-
-	printf("Transform start seconds = %ld, nanoseconds = %ld\n",
+	//printf("Resolution %d x %d"&horizontal,&vertical);
+	
+	printf("Transform start seconds = %ld, nanoseconds = %ld\n", 
         timeptr->start.tv_sec, timeptr->start.tv_nsec);
 
-	printf("Transform stop seconds = %ld, nanoseconds = %ld\n",
+	printf("Transform stop seconds = %ld, nanoseconds = %ld\n", 
         timeptr->stop.tv_sec, timeptr->stop.tv_nsec);
 
-	printf("Transform time required seconds = %ld, nanoseconds = %ld\n",
+	printf("Transform time required seconds = %ld, nanoseconds = %ld\n", 
         timeptr->difference.tv_sec, timeptr->difference.tv_nsec);
 
 	printf("Frames per second = %f\n", fps);
 
-	printf("Jitter seconds = %ld, nanoseconds = %ld\n",
+	printf("Jitter seconds = %ld, nanoseconds = %ld\n", 
         timeptr->jitter.tv_sec, timeptr->jitter.tv_nsec);
 }
 
 void CannyThreshold(int, void*)
 {
-    Mat mat_frame(frame_canny);
+    Mat mat_frame(frame);
 
     cvtColor(mat_frame, timg_gray, CV_RGB2GRAY);
 
+    /// Reduce noise with a kernel 3x3
     blur( timg_gray, canny_frame, Size(3,3) );
 
+    /// Canny detector
     Canny( canny_frame, canny_frame, lowThreshold, lowThreshold*ratio, kernel_size );
 
+    /// Using Canny's output as a mask, we display our result
     timg_grad = Scalar::all(0);
 
     mat_frame.copyTo( timg_grad, canny_frame);
+
+    imshow( timg_window_name, timg_grad );
+
 }
 
-void *canny_func(void *threadid)
+void *canny_func(void *threadp)
 {
-  while(1){
-    sem_wait(&sem_canny);
-    jitter_difference_start(&canny_time_struct);
+    while(1)
+    {
+	jitter_difference_start(&canny_time_struct);
         frame=cvQueryFrame(capture);
         if(!frame) break;
 	jitter_difference_end(&canny_time_struct);
@@ -170,24 +171,20 @@ void *canny_func(void *threadid)
         CannyThreshold(0, 0);
 	jitter_difference_end(&canny_time_struct);
 
-	char c = cvWaitKey(10);
+        char c = cvWaitKey(10);
         if( c == 27 ) break;
-
-    sem_post(&sem_hough);
-  }
-  pthread_exit(NULL);
+    }
 }
 
-void *hough_func(void *threadid)
+void *hough_func(void *threadp)
 {
-  long val;
-  while(1){
-
-    sem_wait(&sem_hough);
-
+    
+    int dev=0;
     Mat gray, canny_frame, cdst;
     vector<Vec4i> lines;
-    jitter_difference_start(&hough_time_struct);
+    while(1)
+    {
+	jitter_difference_start(&hough_time_struct);
         frame=cvQueryFrame(capture);
 
         Mat mat_frame(frame);
@@ -204,34 +201,32 @@ void *hough_func(void *threadid)
           line(mat_frame, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
         }
 
-
+     
         if(!frame) break;
-
+	
         CannyThreshold(0, 0);
 
 	jitter_difference_end(&hough_time_struct);
 	print_time_logs(&hough_time_struct);
 
+        cvShowImage("Capture Example", frame);
+
         char c = cvWaitKey(10);
         if( c == 27 ) break;
-    sem_post(&sem_hough_eliptical);
-  }
-    pthread_exit(NULL);
+    }
 }
 
-void *hough_elip_func(void *threadid)
+void *hough_eliptical_func(void *threadp)
 {
-  long val;
-  while(1){
-    sem_wait(&sem_hough_eliptical);
-
+    int dev=0;
     Mat gray;
     vector<Vec3f> circles;
-
-    jitter_difference_start(&hough_eliptical_time_struct);
+    while(1)
+    {
+	jitter_difference_start(&hough_eliptical_time_struct);
         frame=cvQueryFrame(capture);
 
-        Mat mat_frame(frame);
+        /*Mat mat_frame(frame);
         cvtColor(mat_frame, gray, CV_BGR2GRAY);
         GaussianBlur(gray, gray, Size(9,9), 2, 2);
 
@@ -247,8 +242,8 @@ void *hough_elip_func(void *threadid)
           circle( mat_frame, center, 3, Scalar(0,255,0), -1, 8, 0 );
           // circle outline
           circle( mat_frame, center, radius, Scalar(0,0,255), 3, 8, 0 );
-        }
-
+        }*/
+     
         if(!frame) break;
 	jitter_difference_end(&hough_eliptical_time_struct);
 	print_time_logs(&hough_eliptical_time_struct);
@@ -257,18 +252,45 @@ void *hough_elip_func(void *threadid)
 
         char c = cvWaitKey(10);
         if( c == 27 ) break;
-
-    sem_post(&sem_canny);
-  }
-  pthread_exit(NULL);
+    }
 }
 
-int main(int argc, char** argv)
+int main( int argc, char** argv )
 {
+    int thread_no = 0, dev = 0, rc = 0;
+     if(argc > 1)
+    {
+        sscanf(argv[1], "%d", &dev);
+        printf("using %s\n", argv[1]);
+    }
+    else if(argc == 1)
+        printf("using default\n");
 
-	int dev=0, Max_Priority, thread_no = 0;
-	int rc, scope;
-	uint8_t canny_title[]="\nCanny Interactive Transform\n";
+    else
+    {
+        printf("usage: capture [dev]\n");
+        exit(-1);
+    }
+    cvNamedWindow("Combined", CV_WINDOW_AUTOSIZE);
+    // Create a Trackbar for user to enter threshold
+    createTrackbar( "Min Threshold:", timg_window_name, &lowThreshold, max_lowThreshold, CannyThreshold ); 
+    capture = (CvCapture *)cvCreateCameraCapture(dev);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
+    if(argc > 1)
+    {
+        sscanf(argv[1], "%d", &dev);
+        printf("using %s\n", argv[1]);
+    }
+    else if(argc == 1)
+        printf("using default\n");
+
+    else
+    {
+        printf("usage: capture [dev]\n");
+        exit(-1);
+    }
+    uint8_t canny_title[]="\nCanny Interactive Transform\n";
     uint8_t hough_title[]="\nHough Interactive Transform\n";
     uint8_t hough_eliptical_title[]="\nHough Eliptical Interactive Transform\n";
     canny_time_struct.title=canny_title;
@@ -277,87 +299,27 @@ int main(int argc, char** argv)
     canny_time_struct.deadline.tv_nsec=CANNY_DEADLINE*NSEC_PER_MSEC;
     hough_time_struct.deadline.tv_nsec=HOUGH_DEADLINE*NSEC_PER_MSEC;
     hough_eliptical_time_struct.deadline.tv_nsec=HOUGH_ELIPTICAL_DEADLINE*NSEC_PER_MSEC;
-	capture = (CvCapture *)cvCreateCameraCapture(dev);
 
-	cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
-	cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
-
-	Max_Priority = sched_get_priority_max(SCHED_FIFO);
-
-	pthread_attr_init(&attribute_main);
-	pthread_attr_setinheritsched(&attribute_main,PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy(&attribute_main,SCHED_FIFO);
-	parameter_main.sched_priority = Max_Priority - thread_no;
+   	rc=pthread_attr_init(&attribute_canny);
+  	rc=pthread_attr_setinheritsched(&attribute_canny, PTHREAD_EXPLICIT_SCHED);
+  	rc=pthread_attr_setschedpolicy(&attribute_canny, SCHED_FIFO);
+  	parameter_canny.sched_priority=MAX_PRIORITY-thread_no;
 	thread_no++;
+  	pthread_attr_setschedparam(&attribute_canny, &parameter_canny);
 
-	pthread_attr_init(&attribute_canny);
-	pthread_attr_setinheritsched(&attribute_canny,PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy(&attribute_canny,SCHED_FIFO);
-	parameter_canny.sched_priority = Max_Priority - thread_no;
+   	rc=pthread_attr_init(&attribute_hough);
+  	rc=pthread_attr_setinheritsched(&attribute_hough, PTHREAD_EXPLICIT_SCHED);
+  	rc=pthread_attr_setschedpolicy(&attribute_hough, SCHED_FIFO);
+  	parameter_hough.sched_priority=MAX_PRIORITY-thread_no;
 	thread_no++;
+  	pthread_attr_setschedparam(&attribute_hough, &parameter_hough);
 
-	pthread_attr_init(&attribute_hough_eliptical);
-	pthread_attr_setinheritsched(&attribute_hough,PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy(&attribute_hough,SCHED_FIFO);
-	parameter_hough.sched_priority = Max_Priority - thread_no;
+   	rc=pthread_attr_init(&attribute_hough_eliptical);
+  	rc=pthread_attr_setinheritsched(&attribute_hough_eliptical, PTHREAD_EXPLICIT_SCHED);
+  	rc=pthread_attr_setschedpolicy(&attribute_hough_eliptical, SCHED_FIFO);
+  	parameter_hough_eliptical.sched_priority=MAX_PRIORITY-thread_no;
 	thread_no++;
-
-	pthread_attr_init(&attribute_hough);
-	pthread_attr_setinheritsched(&attribute_hough_eliptical,PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy(&attribute_hough_eliptical,SCHED_FIFO);
-	parameter_hough_eliptical.sched_priority = Max_Priority - thread_no;
-	thread_no++;
-
-	rc=sched_getparam(getpid(), &parameter_scheduler);
-	if (rc)
-	{
-		printf("ERROR; sched_setscheduler rc is %d\n", rc);
-		perror(NULL);
-		exit(-1);
-	}
-
-	rc=sched_setscheduler(getpid(),SCHED_FIFO,&parameter_main);
-	if(rc)
-	{
-		printf("ERROR; main sched_setscheduler rc is %d\n",rc);
-		perror(NULL);
-		exit(-1);
-	}
-
-	print_scheduler();
-
-	pthread_attr_getscope(&attribute_canny, &scope);
-
-	if(scope == PTHREAD_SCOPE_SYSTEM)
-	  printf("PTHREAD SCOPE SYSTEM\n");
-	else if (scope == PTHREAD_SCOPE_PROCESS)
-	  printf("PTHREAD SCOPE PROCESS\n");
-	else
-	  printf("PTHREAD SCOPE UNKNOWN\n");
-
-
-	if (sem_init (&sem_canny, 0, 1))
-	{
-	printf ("Failed to initialize sem_canny semaphore\n");
-	exit (-1);
-	}
-
-	if (sem_init (&sem_hough, 0, 0))
-	{
-	printf ("Failed to initialize sem_hough semaphore\n");
-	exit (-1);
-	}
-
-	if (sem_init (&sem_hough_eliptical, 0, 0))
-	{
-	printf ("Failed to initialize sem_hough_eliptical semaphore\n");
-	exit (-1);
-	}
-
-	pthread_attr_setschedparam(&attribute_canny, &parameter_canny);
-	pthread_attr_setschedparam(&attribute_hough, &parameter_hough);
-	pthread_attr_setschedparam(&attribute_hough_eliptical, &parameter_hough_eliptical);
-	pthread_attr_setschedparam(&attribute_main, &parameter_main);
+  	pthread_attr_setschedparam(&attribute_hough_eliptical, &parameter_hough_eliptical);
 
 	if(pthread_create(&thread_canny, &attribute_canny, canny_func, NULL)==0)
 		printf("\n\rcanny thread created\n\r");
@@ -371,13 +333,11 @@ int main(int argc, char** argv)
 		printf("\n\rhough eliptical thread created\n\r");
   	else perror("\n\rhough eliptical thread creation failed\n\r");
 
-  pthread_join(thread_canny,NULL);
-  pthread_join(thread_hough_eliptical,NULL);
-  pthread_join(thread_hough,NULL);
+  	pthread_join(thread_canny, NULL);
+  	pthread_join(thread_hough, NULL);
+  	pthread_join(thread_hough_eliptical, NULL);
 
-  cvReleaseCapture(&capture);
-  cvDestroyWindow("Combined Transform");
-
-  rc=sched_setscheduler(getpid(), SCHED_OTHER, &parameter_scheduler);
-
-}
+    cvReleaseCapture(&capture);
+    cvDestroyWindow("Capture Example");
+    
+};
