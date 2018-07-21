@@ -1,7 +1,9 @@
 /*
+ * deadlock_modified.c
  *
- * Monish Nene
- *
+ *  Created on: July 4, 2018
+ *      Author: monish
+ * canny interactive, hough interactive and hough eliptical interactive transforms combined
  */
 #include <unistd.h>
 #include <stdio.h>
@@ -67,6 +69,14 @@ static measured_time canny_time_struct;
 static measured_time hough_time_struct;
 static measured_time hough_eliptical_time_struct;
 
+/***********************************************************************
+  * @brief delta_t()
+  * Find the difference between two timespec structures eg a - b =c 
+  * @param struct timespec *stop (a)
+  * @param struct timespec *start (b)
+  * @param struct timespec *delta_t (c)
+  * @return success or fail
+  ***********************************************************************/
 int delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t)
 {
   int dt_sec=stop->tv_sec - start->tv_sec;
@@ -103,11 +113,22 @@ int delta_t(struct timespec *stop, struct timespec *start, struct timespec *delt
 }
 
 
+/***********************************************************************
+  * @brief jitter_difference_start()
+  * Measure start time of a thread 
+  * @param measured_time * timeptr pointer to thread time structure
+  ***********************************************************************/
 void jitter_difference_start(measured_time * timeptr)
 {
   	clock_gettime(CLOCK_REALTIME, &(timeptr->start));
 }
 
+
+/***********************************************************************
+  * @brief jitter_difference_end()
+  * Measure stop time of a thread and calculate execution time
+  * @param measured_time * timeptr pointer to thread time structure
+  ***********************************************************************/
 void jitter_difference_end(measured_time * timeptr)
 {
   	clock_gettime(CLOCK_REALTIME, &(timeptr->stop));
@@ -121,6 +142,12 @@ void jitter_difference_end(measured_time * timeptr)
 	return;
 }
 
+
+/***********************************************************************
+  * @brief print_time_logs()
+  * print start time, stop time, execution time, jitter and fps logs for various threads 
+  * @param measured_time * timeptr pointer to thread time structure
+  ***********************************************************************/
 void print_time_logs(measured_time * timeptr)
 {
 	printf("%s",timeptr->title);
@@ -141,6 +168,12 @@ void print_time_logs(measured_time * timeptr)
         timeptr->jitter.tv_sec, timeptr->jitter.tv_nsec);
 }
 
+
+/***********************************************************************
+  * @brief CannyThreshold()
+  * Adjust canny threshold value
+  * @param threshold to be set
+  ***********************************************************************/
 void CannyThreshold(int, void*)
 {
     Mat mat_frame(frame_canny);
@@ -156,6 +189,10 @@ void CannyThreshold(int, void*)
     mat_frame.copyTo( timg_grad, canny_frame);
 }
 
+/***********************************************************************
+  * @brief canny_func()
+  * capture frame and implement canny interactive transform
+  ***********************************************************************/
 void *canny_func(void *threadid)
 {
   while(1){
@@ -176,6 +213,11 @@ void *canny_func(void *threadid)
   pthread_exit(NULL);
 }
 
+
+/***********************************************************************
+  * @brief hough_func()
+  * capture frame and implement hough interactive transform
+  ***********************************************************************/
 void *hough_func(void *threadid)
 {
   long val;
@@ -217,6 +259,11 @@ void *hough_func(void *threadid)
     pthread_exit(NULL);
 }
 
+
+/***********************************************************************
+  * @brief hough_eliptical_func()
+  * capture frame and implement hough eliptical interactive transform
+  ***********************************************************************/
 void *hough_eliptical_func(void *threadid)
 {
   long val;
@@ -259,6 +306,11 @@ void *hough_eliptical_func(void *threadid)
   pthread_exit(NULL);
 }
 
+
+/***********************************************************************
+  * @brief main()
+  * initialize variables and threads
+  ***********************************************************************/
 int main(int argc, char** argv)
 {
 
