@@ -206,8 +206,8 @@ int main( int argc, char** argv )
         printf("usage: capture [dev]\n");
         exit(-1);
     }
-    uint8_t canny_title[]="\nCanny Interactive Transform\n";=
-    canny_time_struct.title=canny_title;]
+    uint8_t canny_title[]="\nCanny Interactive Transform\n";
+    canny_time_struct.title=canny_title;
     canny_time_struct.deadline.tv_nsec=CANNY_DEADLINE*NSEC_PER_MSEC;
 
    	rc=pthread_attr_init(&attribute_canny);

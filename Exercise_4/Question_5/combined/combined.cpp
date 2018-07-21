@@ -1,6 +1,6 @@
 /*
  *
- *  Example by Monish Nene
+ * Monish Nene
  *
  */
 #include <unistd.h>
@@ -22,8 +22,8 @@ using namespace std;
 #define OK (0)
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
-#define HRES 1280
-#define VRES 960
+#define HRES 80
+#define VRES 60
 #define CANNY_DEADLINE 20
 #define HOUGH_DEADLINE 30
 #define HOUGH_ELIPTICAL_DEADLINE 40
@@ -44,10 +44,9 @@ IplImage* frame_hough;
 IplImage* frame_hough_eliptical;
 
 CvCapture* capture;
-int horizontal = HRES, vertical = VRES;
 double fps = 0;
 
-pthread_t thread_canny, thread_hough, thread_hough_elipticaltical;
+pthread_t thread_canny, thread_hough, thread_hough_eliptical;
 
 pthread_attr_t attribute_main, attribute_canny, attribute_hough, attribute_hough_eliptical;
 
@@ -115,7 +114,7 @@ void jitter_difference_end(measured_time * timeptr)
 
 	delta_t(&(timeptr->stop),&(timeptr->start), &(timeptr->difference));
 
-	fps = 1/(timeptr->difference.tv_sec+double(timeptr->difference.tv_nsec/NSEC_PER_SEC));
+	fps = NSEC_PER_SEC/timeptr->difference.tv_nsec;
 
 	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));
 
@@ -125,7 +124,7 @@ void jitter_difference_end(measured_time * timeptr)
 void print_time_logs(measured_time * timeptr)
 {
 	printf("%s",timeptr->title);
-	printf("Resolution %d x %d\n"&horizontal,&vertical);
+	printf("Resolution 80 x 60\n");
 
 	printf("Transform start seconds = %ld, nanoseconds = %ld\n",
         timeptr->start.tv_sec, timeptr->start.tv_nsec);
@@ -162,13 +161,12 @@ void *canny_func(void *threadid)
   while(1){
     sem_wait(&sem_canny);
     jitter_difference_start(&canny_time_struct);
-        frame=cvQueryFrame(capture);
-        if(!frame) break;
+        frame_canny =cvQueryFrame(capture);
+        if(!frame_canny ) break;
 	jitter_difference_end(&canny_time_struct);
 	print_time_logs(&canny_time_struct);
 
         CannyThreshold(0, 0);
-	jitter_difference_end(&canny_time_struct);
 
 	char c = cvWaitKey(10);
         if( c == 27 ) break;
@@ -185,18 +183,18 @@ void *hough_func(void *threadid)
 
     sem_wait(&sem_hough);
 
-    Mat gray, canny_frame, cdst;
+    Mat gray, canny_frame_h, cdst;
     vector<Vec4i> lines;
     jitter_difference_start(&hough_time_struct);
-        frame=cvQueryFrame(capture);
+        frame_hough =cvQueryFrame(capture);
 
-        Mat mat_frame(frame);
-        Canny(mat_frame, canny_frame, 50, 200, 3);
+        Mat mat_frame(frame_hough);
+        Canny(mat_frame, canny_frame_h, 50, 200, 3);
 
-        //cvtColor(canny_frame, cdst, CV_GRAY2BGR);
-        //cvtColor(mat_frame, gray, CV_BGR2GRAY);
+        cvtColor(canny_frame_h, cdst, CV_GRAY2BGR);
+        cvtColor(mat_frame, gray, CV_BGR2GRAY);
 
-        HoughLinesP(canny_frame, lines, 1, CV_PI/180, 50, 50, 10);
+        HoughLinesP(canny_frame_h, lines, 1, CV_PI/180, 50, 50, 10);
 
         for( size_t i = 0; i < lines.size(); i++ )
         {
@@ -205,7 +203,7 @@ void *hough_func(void *threadid)
         }
 
 
-        if(!frame) break;
+        if(!frame_hough) break;
 
         CannyThreshold(0, 0);
 
@@ -219,7 +217,7 @@ void *hough_func(void *threadid)
     pthread_exit(NULL);
 }
 
-void *hough_elip_func(void *threadid)
+void *hough_eliptical_func(void *threadid)
 {
   long val;
   while(1){
@@ -229,9 +227,9 @@ void *hough_elip_func(void *threadid)
     vector<Vec3f> circles;
 
     jitter_difference_start(&hough_eliptical_time_struct);
-        frame=cvQueryFrame(capture);
+        frame_hough_eliptical=cvQueryFrame(capture);
 
-        Mat mat_frame(frame);
+        Mat mat_frame(frame_hough_eliptical);
         cvtColor(mat_frame, gray, CV_BGR2GRAY);
         GaussianBlur(gray, gray, Size(9,9), 2, 2);
 
@@ -249,11 +247,9 @@ void *hough_elip_func(void *threadid)
           circle( mat_frame, center, radius, Scalar(0,0,255), 3, 8, 0 );
         }
 
-        if(!frame) break;
+        if(!frame_hough_eliptical) break;
 	jitter_difference_end(&hough_eliptical_time_struct);
 	print_time_logs(&hough_eliptical_time_struct);
-
-        cvShowImage("Capture Example", frame);
 
         char c = cvWaitKey(10);
         if( c == 27 ) break;
@@ -323,18 +319,6 @@ int main(int argc, char** argv)
 		perror(NULL);
 		exit(-1);
 	}
-
-	print_scheduler();
-
-	pthread_attr_getscope(&attribute_canny, &scope);
-
-	if(scope == PTHREAD_SCOPE_SYSTEM)
-	  printf("PTHREAD SCOPE SYSTEM\n");
-	else if (scope == PTHREAD_SCOPE_PROCESS)
-	  printf("PTHREAD SCOPE PROCESS\n");
-	else
-	  printf("PTHREAD SCOPE UNKNOWN\n");
-
 
 	if (sem_init (&sem_canny, 0, 1))
 	{

@@ -184,7 +184,6 @@ int main( int argc, char** argv )
     }
     cvNamedWindow("Combined", CV_WINDOW_AUTOSIZE);
     // Create a Trackbar for user to enter threshold
-    createTrackbar( "Min Threshold:", timg_window_name, &lowThreshold, max_lowThreshold, CannyThreshold ); 
     capture = (CvCapture *)cvCreateCameraCapture(dev);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, HRES);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, VRES);
