@@ -36,26 +36,26 @@ typedef struct
 
 typedef struct
 {
-	unit8_t priority = Max_Priority - thread_count++;
+	uint8_t priority = Max_Priority - thread_count++;
 	uint8_t thread_id = thread_count;
-	pthread thread;
+	pthread_t thread;
 	pthread_attr_t attribute;
 	struct sched_param parameter;
 	measured_time time_struct;
-	void(*function_pointer)();
+	void*(*function_pointer)(void*);
 }thread_properties;
 
 thread_properties print_welcome,print_name; 
 
 
-void welcome(void)
+void* welcome(void* ptr)
 {
-	printf("\n\rWhat's up bitch!?");
+	printf("What's up bitch!?\n\r");
 }
 
-void name(void)
+void* name(void* ptr)
 {
-	printf("\n\rI am Monish Nene.");
+	printf("I am Monish Nene.\n\r");
 }
 
 void thread_create(thread_properties* struct_pointer)
@@ -63,16 +63,16 @@ void thread_create(thread_properties* struct_pointer)
 	pthread_attr_init(&(struct_pointer->attribute));
 	pthread_attr_setinheritsched(&(struct_pointer->attribute),PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&(struct_pointer->attribute),SCHED_FIFO);
-	parameter_hough_eliptical.sched_priority = struct_pointer->priority;
+	struct_pointer->parameter.sched_priority = struct_pointer->priority;
 	pthread_attr_setschedparam(&(struct_pointer->attribute), &(struct_pointer->parameter));
 	if(pthread_create(&(struct_pointer->thread), &(struct_pointer->attribute), struct_pointer->function_pointer, NULL)==0)
-		printf("\n\rthread %d created\n\r",thread_properties->thread_id);
-  	else perror("\n\rthread %d creation failed\n\r",thread_properties->thread_id);
+		printf("thread %d created\n\r",struct_pointer->thread_id);
+  	else printf("thread %d creation failed\n\r",struct_pointer->thread_id);
 }
 
 void thread_join(thread_properties* struct_pointer)
 {
-	pthread_join(&(struct_pointer->thread));
+	pthread_join(struct_pointer->thread,NULL);
 }
 
 /***********************************************************************
@@ -141,7 +141,7 @@ void jitter_difference_end(measured_time * timeptr)
 
 	delta_t(&(timeptr->stop),&(timeptr->start), &(timeptr->difference));
 
-	fps = NSEC_PER_SEC/timeptr->difference.tv_nsec;
+	//fps = NSEC_PER_SEC/timeptr->difference.tv_nsec;
 
 	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));
 
@@ -164,7 +164,7 @@ void print_time_logs(measured_time * timeptr)
 	printf("Transform time required seconds = %ld, nanoseconds = %ld\n",
         timeptr->difference.tv_sec, timeptr->difference.tv_nsec);
 
-	printf("Frames per second = %f\n", fps);
+	//printf("Frames per second = %f\n", fps);
 
 	printf("Jitter seconds = %ld, nanoseconds = %ld\n",
         timeptr->jitter.tv_sec, timeptr->jitter.tv_nsec);
