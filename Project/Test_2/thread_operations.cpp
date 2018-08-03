@@ -17,11 +17,13 @@
 
 using namespace std;
 
+#define MAX_PRIORITY  sched_get_priority_max(SCHED_FIFO)
+
 #define OK (0)
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 
-uint8_t Max_Priority,thread_count=0;
+uint8_t thread_count=0;
 
 typedef struct
 {
@@ -36,7 +38,7 @@ typedef struct
 
 typedef struct
 {
-	uint8_t priority = Max_Priority - thread_count++;
+	uint8_t priority = MAX_PRIORITY - thread_count++;
 	uint8_t thread_id = thread_count;
 	pthread_t thread;
 	pthread_attr_t attribute;
@@ -46,7 +48,6 @@ typedef struct
 }thread_properties;
 
 thread_properties print_welcome,print_name; 
-
 
 void* welcome(void* ptr)
 {
@@ -177,8 +178,6 @@ void print_time_logs(measured_time * timeptr)
 int main(int argc, char** argv)
 {
 	int rc;
-
-	Max_Priority = sched_get_priority_max(SCHED_FIFO);
 	print_welcome.function_pointer = welcome;
 	print_name.function_pointer = name;
 	thread_create(&print_welcome);
