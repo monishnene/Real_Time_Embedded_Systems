@@ -15,11 +15,6 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
-using namespace cv;
 using namespace std;
 
 #define MAX_PRIORITY  sched_get_priority_max(SCHED_FIFO)
@@ -29,18 +24,8 @@ using namespace std;
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 2
 
-uint8_t thread_count=0;
-
-typedef struct
-{
-	uint8_t* title;
-	float frames;
-	struct timespec deadline;
-	struct timespec start;
-	struct timespec stop;
-	struct timespec difference;
-	struct timespec jitter;
-}measured_time;
+uint8_t thread_count=0,error=0;
+struct timespec code_start_time={0,0};
 
 typedef struct
 {
@@ -50,51 +35,17 @@ typedef struct
 	sem_t sem;
 	pthread_attr_t attribute;
 	struct sched_param parameter;
-	measured_time time_struct;
 	void*(*function_pointer)(void*);
+	uint8_t* title;
+	uint32_t counter=0;
+	double start_ms=0;
+	double stop_ms=0;
+	double difference_ms=0;
+	double accumulated_jitter_ms=0;
+	double average_jitter_ms=0;
 }thread_properties;
 
-thread_properties print_welcome,print_name; 
-
-void* welcome(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(print_welcome.sem));
-		printf("What's up bitch!?\n\r");
-		sem_post(&(print_name.sem));
-	}
-	pthread_exit(NULL);
-}
-
-void* name(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(print_name.sem));
-		printf("I am Monish Nene.\n\r");
-		sem_post(&(print_welcome.sem));		
-	}
-	pthread_exit(NULL);
-}
-
-void thread_create(thread_properties* struct_pointer)
-{	
-	pthread_attr_init(&(struct_pointer->attribute));
-	pthread_attr_setinheritsched(&(struct_pointer->attribute),PTHREAD_EXPLICIT_SCHED);
-	pthread_attr_setschedpolicy(&(struct_pointer->attribute),SCHED_FIFO);
-	struct_pointer->parameter.sched_priority = struct_pointer->priority;
-	sem_init(&(struct_pointer->sem),0,0);
-	pthread_attr_setschedparam(&(struct_pointer->attribute), &(struct_pointer->parameter));
-	if(pthread_create(&(struct_pointer->thread), &(struct_pointer->attribute), struct_pointer->function_pointer, NULL)==0)
-		printf("thread %d created\n\r",struct_pointer->thread_id);
-  	else printf("thread %d creation failed\n\r",struct_pointer->thread_id);
-} 
-
-void thread_join(thread_properties* struct_pointer)
-{
-	pthread_join(struct_pointer->thread,NULL);
-}
+thread_properties func1_props,func2_props,func3_props,func4_props; 
 
 /***********************************************************************
   * @brief delta_t()
@@ -104,7 +55,7 @@ void thread_join(thread_properties* struct_pointer)
   * @param struct timespec *delta_t (c)
   * @return success or fail
   ***********************************************************************/
-int delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t)
+void delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t)
 {
   int dt_sec=stop->tv_sec - start->tv_sec;
   int dt_nsec=stop->tv_nsec - start->tv_nsec;
@@ -135,19 +86,21 @@ int delta_t(struct timespec *stop, struct timespec *start, struct timespec *delt
       delta_t->tv_nsec=NSEC_PER_SEC+dt_nsec;
     }
   }
-
-  return(OK);
+  return;
 }
-
 
 /***********************************************************************
   * @brief jitter_difference_start()
   * Measure start time of a thread 
   * @param measured_time * timeptr pointer to thread time structure
   ***********************************************************************/
-void jitter_difference_start(measured_time * timeptr)
+void jitter_difference_start(thread_properties * timeptr)
 {
-  	clock_gettime(CLOCK_REALTIME, &(timeptr->start));
+	struct timespec fetched_time,delta_time;
+	clock_gettime(CLOCK_REALTIME, &fetched_time);
+	delta_t(&fetched_time, &code_start_time, &delta_time);
+  	timeptr->start_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
+	return;
 }
 
 
@@ -156,39 +109,110 @@ void jitter_difference_start(measured_time * timeptr)
   * Measure stop time of a thread and calculate execution time
   * @param measured_time * timeptr pointer to thread time structure
   ***********************************************************************/
-void jitter_difference_end(measured_time * timeptr)
+void jitter_difference_end(thread_properties * timeptr)
 {
-  	clock_gettime(CLOCK_REALTIME, &(timeptr->stop));
-
-	delta_t(&(timeptr->stop),&(timeptr->start), &(timeptr->difference));
-
-	//fps = NSEC_PER_SEC/timeptr->difference.tv_nsec;
-
-	delta_t(&(timeptr->difference), &(timeptr->deadline), &(timeptr->jitter));
-
-	return;
+  	struct timespec fetched_time,delta_time;
+	double prev_difference = 0;
+	clock_gettime(CLOCK_REALTIME, &fetched_time);
+	delta_t(&fetched_time, &code_start_time, &delta_time);
+  	timeptr->stop_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
+	prev_difference = timeptr->difference_ms;
+	timeptr->difference_ms = double(timeptr->stop_ms - timeptr->start_ms);
+	if(timeptr->counter > 0)
+	{
+		timeptr->accumulated_jitter_ms += double(timeptr->difference_ms - prev_difference);
+		timeptr->average_jitter_ms = double(timeptr->accumulated_jitter_ms/ timeptr->counter);
+	}	
+	timeptr->counter++;
+	return; 	
 }
 
-/***********************************************************************
+/**********************************************************************
   * @brief print_time_logs()
   * print start time, stop time, execution time, jitter and fps logs for various threads 
   * @param measured_time * timeptr pointer to thread time structure
   ***********************************************************************/
-void print_time_logs(measured_time * timeptr)
+void print_time_logs(thread_properties * timeptr)
 {
-	printf("Transform start seconds = %ld, nanoseconds = %ld\n",
-        timeptr->start.tv_sec, timeptr->start.tv_nsec);
+	printf("Thread %d starts at %f ns\n",timeptr->thread_id,timeptr->start_ms);
+	printf("Thread %d stops  at %f ns\n",timeptr->thread_id,timeptr->stop_ms);
+	printf("Thread %d Duration %f ns\n",timeptr->thread_id,timeptr->difference_ms);
+	printf("Thread %d accumulated jitter %f ns\n",timeptr->thread_id,timeptr->accumulated_jitter_ms);
+	printf("Thread %d average jitter %f ns\n",timeptr->thread_id,timeptr->average_jitter_ms);
+}
 
-	printf("Transform stop seconds = %ld, nanoseconds = %ld\n",
-        timeptr->stop.tv_sec, timeptr->stop.tv_nsec);
+void* func_1(void* ptr)
+{
+	while(1)
+	{	
+		sem_wait(&(func1_props.sem));
+		jitter_difference_start(&(func1_props));
+		printf("\n\rPikachu\n\r");
+		jitter_difference_end(&(func1_props));
+		print_time_logs(&(func1_props));
+		sem_post(&(func2_props.sem));
+	}
+	pthread_exit(NULL);
+}
 
-	printf("Transform time required seconds = %ld, nanoseconds = %ld\n",
-        timeptr->difference.tv_sec, timeptr->difference.tv_nsec);
+void* func_2(void* ptr)
+{
+	while(1)
+	{	
+		sem_wait(&(func2_props.sem));
+		jitter_difference_start(&(func2_props));
+		printf("\n\rCharmander\n\r");
+		jitter_difference_end(&(func2_props));
+		print_time_logs(&(func2_props));
+		sem_post(&(func3_props.sem));
+	}
+	pthread_exit(NULL);
+}
 
-	//printf("Frames per second = %f\n", fps);
+void* func_3(void* ptr)
+{
+	while(1)
+	{	
+		sem_wait(&(func3_props.sem));
+		jitter_difference_start(&(func3_props));
+		printf("\n\rSquirtle\n\r");
+		jitter_difference_end(&(func3_props));
+		print_time_logs(&(func3_props));
+		sem_post(&(func4_props.sem));
+	}
+	pthread_exit(NULL);
+}
 
-	printf("Jitter seconds = %ld, nanoseconds = %ld\n",
-        timeptr->jitter.tv_sec, timeptr->jitter.tv_nsec);
+void* func_4(void* ptr)
+{
+	while(1)
+	{	
+		sem_wait(&(func4_props.sem));
+		jitter_difference_start(&(func4_props));
+		printf("\n\rBulbasaur\n\r");
+		jitter_difference_end(&(func4_props));
+		print_time_logs(&(func4_props));
+		sem_post(&(func1_props.sem));
+	}
+	pthread_exit(NULL);
+}
+
+void thread_create(thread_properties* struct_pointer)
+{	
+	pthread_attr_init(&(struct_pointer->attribute));
+	pthread_attr_setinheritsched(&(struct_pointer->attribute),PTHREAD_EXPLICIT_SCHED);
+	pthread_attr_setschedpolicy(&(struct_pointer->attribute),SCHED_FIFO);
+	struct_pointer->parameter.sched_priority = struct_pointer->priority;
+	sem_init(&(struct_pointer->sem),0,0);
+	pthread_attr_setschedparam(&(struct_pointer->attribute), &(struct_pointer->parameter));
+	if(pthread_create(&(struct_pointer->thread), &(struct_pointer->attribute), struct_pointer->function_pointer, NULL)==0)
+		printf("thread %d created\n\r",struct_pointer->thread_id);
+  	else printf("thread %d creation failed\n\r",struct_pointer->thread_id);
+} 
+
+void thread_join(thread_properties* struct_pointer)
+{
+	pthread_join(struct_pointer->thread,NULL);
 }
 
 /***********************************************************************
@@ -198,11 +222,18 @@ void print_time_logs(measured_time * timeptr)
 int main(int argc, char** argv)
 {
 	int rc;
-	print_welcome.function_pointer = welcome;
-	print_name.function_pointer = name;
-	thread_create(&print_welcome);
-	thread_create(&print_name);
-	sem_post(&(print_welcome.sem));
-	thread_join(&print_welcome);
-	thread_join(&print_name);
+	clock_gettime(CLOCK_REALTIME,&code_start_time); 
+	func1_props.function_pointer = func_1; 
+	func2_props.function_pointer = func_2; 
+	func3_props.function_pointer = func_3; 
+	func4_props.function_pointer = func_4;
+	thread_create(&func1_props);
+	thread_create(&func2_props);
+	thread_create(&func3_props);
+	thread_create(&func4_props);
+	sem_post(&(func1_props.sem));
+	thread_join(&func1_props);
+	thread_join(&func2_props);
+	thread_join(&func3_props);
+	thread_join(&func4_props);
 }
