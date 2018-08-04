@@ -1,6 +1,8 @@
 	common_sources=	thread_operations.cpp
 	
 	common_includes =
+		
+	opencv_flags =	-L/usr/lib	-lopencv_core	-lopencv_flann	-lopencv_video 
 
 	common_flags =	-g \
 			-pg \
@@ -23,7 +25,7 @@
 build:	thread_operations.elf	
 
 %.elf:%.o
-	$(CC)	$(flags)	$(includes)	-o	$@	$<	-lrt
+	$(CC)	$(flags)	$(includes)	-o	$@	$<	-lrt	`pkg-config --libs opencv`	$(opencv_flags)	
 
 %.i:%.cpp	
 	$(CC)	$(flags)	$(includes)	-S	$<	-o	$@

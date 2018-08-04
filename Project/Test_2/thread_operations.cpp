@@ -15,6 +15,11 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
+using namespace cv;
 using namespace std;
 
 #define MAX_PRIORITY  sched_get_priority_max(SCHED_FIFO)
@@ -22,6 +27,7 @@ using namespace std;
 #define OK (0)
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
+#define TOTAL_THREADS 2
 
 uint8_t thread_count=0;
 
@@ -41,6 +47,7 @@ typedef struct
 	uint8_t priority = MAX_PRIORITY - thread_count++;
 	uint8_t thread_id = thread_count;
 	pthread_t thread;
+	sem_t sem;
 	pthread_attr_t attribute;
 	struct sched_param parameter;
 	measured_time time_struct;
@@ -51,12 +58,24 @@ thread_properties print_welcome,print_name;
 
 void* welcome(void* ptr)
 {
-	printf("What's up bitch!?\n\r");
+	while(1)
+	{	
+		sem_wait(&(print_welcome.sem));
+		printf("What's up bitch!?\n\r");
+		sem_post(&(print_name.sem));
+	}
+	pthread_exit(NULL);
 }
 
 void* name(void* ptr)
 {
-	printf("I am Monish Nene.\n\r");
+	while(1)
+	{	
+		sem_wait(&(print_name.sem));
+		printf("I am Monish Nene.\n\r");
+		sem_post(&(print_welcome.sem));		
+	}
+	pthread_exit(NULL);
 }
 
 void thread_create(thread_properties* struct_pointer)
@@ -65,11 +84,12 @@ void thread_create(thread_properties* struct_pointer)
 	pthread_attr_setinheritsched(&(struct_pointer->attribute),PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&(struct_pointer->attribute),SCHED_FIFO);
 	struct_pointer->parameter.sched_priority = struct_pointer->priority;
+	sem_init(&(struct_pointer->sem),0,0);
 	pthread_attr_setschedparam(&(struct_pointer->attribute), &(struct_pointer->parameter));
 	if(pthread_create(&(struct_pointer->thread), &(struct_pointer->attribute), struct_pointer->function_pointer, NULL)==0)
 		printf("thread %d created\n\r",struct_pointer->thread_id);
   	else printf("thread %d creation failed\n\r",struct_pointer->thread_id);
-}
+} 
 
 void thread_join(thread_properties* struct_pointer)
 {
@@ -182,6 +202,7 @@ int main(int argc, char** argv)
 	print_name.function_pointer = name;
 	thread_create(&print_welcome);
 	thread_create(&print_name);
+	sem_post(&(print_welcome.sem));
 	thread_join(&print_welcome);
 	thread_join(&print_name);
 }
