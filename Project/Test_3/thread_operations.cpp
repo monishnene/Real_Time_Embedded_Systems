@@ -6,46 +6,7 @@
  * Create, join thread
  */
 
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <iostream>
-#include <time.h>
-#include <sys/param.h>
-#include <pthread.h>
-#include <semaphore.h>
-
-using namespace std;
-
-#define MAX_PRIORITY  sched_get_priority_max(SCHED_FIFO)
-
-#define OK (0)
-#define NSEC_PER_SEC 1000000000
-#define NSEC_PER_MSEC 1000000
-#define TOTAL_THREADS 7
-
-uint8_t thread_count=0,error=0;
-struct timespec code_start_time={0,0};
-
-typedef struct
-{
-	uint8_t priority = MAX_PRIORITY - thread_count++;
-	uint8_t thread_id = thread_count;
-	pthread_t thread;
-	sem_t sem;
-	pthread_attr_t attribute;
-	struct sched_param parameter;
-	void*(*function_pointer)(void*);
-	uint8_t* title;
-	uint32_t counter=0;
-	double start_ms=0;
-	double stop_ms=0;
-	double difference_ms=0;
-	double accumulated_jitter_ms=0;
-	double average_jitter_ms=0;
-}thread_properties;
-
-thread_properties func_props[TOTAL_THREADS]; 
+#include "thread_operations.hpp"
 
 /***********************************************************************
   * @brief delta_t()
@@ -118,12 +79,12 @@ void jitter_difference_end(thread_properties * timeptr)
   	timeptr->stop_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
 	prev_difference = timeptr->difference_ms;
 	timeptr->difference_ms = double(timeptr->stop_ms - timeptr->start_ms);
-	if(timeptr->counter > 0)
+	timeptr->counter++;
+	if(timeptr->counter > 1)
 	{
 		timeptr->accumulated_jitter_ms += double(timeptr->difference_ms - prev_difference);
 		timeptr->average_jitter_ms = double(timeptr->accumulated_jitter_ms/ timeptr->counter);
 	}	
-	timeptr->counter++;
 	return; 	
 }
 
@@ -141,104 +102,38 @@ void print_time_logs(thread_properties * timeptr)
 	printf("Thread %d average jitter %f ns\n",timeptr->thread_id,timeptr->average_jitter_ms);
 }
 
-void* func_1(void* ptr)
+void function_end(uint8_t func_id)
 {
-	while(1)
-	{	
-		sem_wait(&(func_props[0].sem));
-		jitter_difference_start(&func_props[0]);
-		printf("\n\rPikachu\n\r");
-		jitter_difference_end(&func_props[0]);
-		print_time_logs(&func_props[0]);
-		sem_post(&func_props[1].sem);
+	jitter_difference_end(&func_props[func_id]);
+	print_time_logs(&func_props[func_id]);
+	if(func_id == TOTAL_THREADS-1)
+	{
+		func_id = 0;
 	}
-	pthread_exit(NULL);
+	else
+	{
+		func_id++;
+	}
+	sem_post(&(func_props[func_id].sem));
+	return;
 }
 
-void* func_2(void* ptr)
+void function_beginning(uint8_t func_id)
 {
-	while(1)
-	{	
-		sem_wait(&(func_props[1].sem));
-		jitter_difference_start(&func_props[1]);
-		printf("\n\rCharmander\n\r");
-		jitter_difference_end(&func_props[1]);
-		print_time_logs(&func_props[1]);
-		sem_post(&(func_props[2].sem));
-	}
-	pthread_exit(NULL);
+	sem_wait(&(func_props[func_id].sem));		
+	jitter_difference_start(&func_props[func_id]);
+	return;
 }
 
-void* func_3(void* ptr)
+void loop_condition_check(void)
 {
-	while(1)
-	{	
-		sem_wait(&(func_props[2].sem));
-		jitter_difference_start(&func_props[2]);
-		printf("\n\rSquirtle\n\r");
-		jitter_difference_end(&func_props[2]);
-		print_time_logs(&func_props[2]);
-		sem_post(&(func_props[3].sem));
+	static uint32_t iterations=0;
+	if(++iterations==TOTAL_CAPTURES)
+	{
+		loop_condition=False;
 	}
-	pthread_exit(NULL);
-}
-
-void* func_4(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[3].sem));
-		jitter_difference_start(&func_props[3]);
-		printf("\n\rBulbasaur\n\r");
-		jitter_difference_end(&func_props[3]);
-		print_time_logs(&func_props[3]);
-		sem_post(&(func_props[4].sem));
-	}
-	pthread_exit(NULL);
-}
-
-void* func_5(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[4].sem));
-		jitter_difference_start(&func_props[4]);
-		printf("\n\rPrimeape\n\r");
-		jitter_difference_end(&func_props[4]);
-		print_time_logs(&func_props[4]);
-		sem_post(&(func_props[5].sem));
-	}
-	pthread_exit(NULL);
-}
-
-void* func_6(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[5].sem));
-		jitter_difference_start(&func_props[5]);
-		printf("\n\rGengar\n\r");
-		jitter_difference_end(&func_props[5]);
-		print_time_logs(&func_props[5]);
-		sem_post(&(func_props[6].sem));
-	}
-	pthread_exit(NULL);
-}
-
-void* func_7(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[6].sem));
-		jitter_difference_start(&func_props[6]);
-		printf("\n\rSnorlax\n\r");
-		jitter_difference_end(&func_props[6]);
-		print_time_logs(&func_props[6]);
-		sem_post(&(func_props[0].sem));
-	}
-	pthread_exit(NULL);
-}
-
+	return;
+}	
 
 void thread_create(thread_properties* struct_pointer)
 {	
@@ -258,28 +153,3 @@ void thread_join(thread_properties* struct_pointer)
 	pthread_join(struct_pointer->thread,NULL);
 }
 
-/***********************************************************************
-  * @brief main()
-  * initialize variables and threads
-  ***********************************************************************/
-int main(int argc, char** argv)
-{
-	uint8_t i=0;
-	clock_gettime(CLOCK_REALTIME,&code_start_time); 
-	func_props[0].function_pointer = func_1; 
-	func_props[1].function_pointer = func_2; 
-	func_props[2].function_pointer = func_3; 
-	func_props[3].function_pointer = func_4;
-	func_props[4].function_pointer = func_5;
-	func_props[5].function_pointer = func_6;
-	func_props[6].function_pointer = func_7;
-	for(i=0;i<TOTAL_THREADS;i++)
-	{
-		thread_create(&func_props[i]);
-	}
-	sem_post(&(func_props[0].sem));
-	for(i=0;i<TOTAL_THREADS;i++)
-	{
-		thread_join(&func_props[i]);
-	}
-}

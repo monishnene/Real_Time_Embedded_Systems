@@ -414,7 +414,7 @@ int main(int argc, char** argv)
 		printf("\n\rhough thread created\n\r");
   	else perror("\n\rhough thread creation failed\n\r");
 
-	if(pthread_create(&thread_hough_eliptical, &attribute_hough_eliptical, hough_eliptical_func, NULL)==0)
+	if(pthread_create(&thread_hough_elipti	cal, &attribute_hough_eliptical, hough_eliptical_func, NULL)==0)
 		printf("\n\rhough eliptical thread created\n\r");
   	else perror("\n\rhough eliptical thread creation failed\n\r");
 

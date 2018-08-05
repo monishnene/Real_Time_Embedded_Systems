@@ -1,10 +1,11 @@
 /*
- * thrad_operations.cpp
+ * project.cpp
  *
  *  Created on: August 4, 2018
  *      Author: monish
- * Create, join thread
+ * Main, initializations and primary functions
  */
+
 
 #include <unistd.h>
 #include <stdio.h>
@@ -23,9 +24,11 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
+#define TOTAL_CAPTURES 2000
+#define True 1
+#define False 0
 
-uint8_t thread_count=0,error=0;
-struct timespec code_start_time={0,0};
+static uint8_t thread_count=0,error=0,loop_condition=True;
 
 typedef struct
 {
@@ -45,7 +48,20 @@ typedef struct
 	double average_jitter_ms=0;
 }thread_properties;
 
-thread_properties func_props[TOTAL_THREADS]; 
+static struct timespec code_start_time;
+
+static thread_properties func_props[TOTAL_THREADS];
+
+void delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t);
+void jitter_difference_start(thread_properties * timeptr);
+void jitter_difference_end(thread_properties * timeptr);
+void print_time_logs(thread_properties * timeptr);
+void function_end(uint8_t func_id);
+void function_beginning(uint8_t func_id);
+void loop_condition_check(void);
+void thread_create(thread_properties* struct_pointer);
+void thread_join(thread_properties* struct_pointer);
+
 
 /***********************************************************************
   * @brief delta_t()
@@ -118,12 +134,12 @@ void jitter_difference_end(thread_properties * timeptr)
   	timeptr->stop_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
 	prev_difference = timeptr->difference_ms;
 	timeptr->difference_ms = double(timeptr->stop_ms - timeptr->start_ms);
-	if(timeptr->counter > 0)
+	timeptr->counter++;
+	if(timeptr->counter > 1)
 	{
 		timeptr->accumulated_jitter_ms += double(timeptr->difference_ms - prev_difference);
 		timeptr->average_jitter_ms = double(timeptr->accumulated_jitter_ms/ timeptr->counter);
 	}	
-	timeptr->counter++;
 	return; 	
 }
 
@@ -141,104 +157,38 @@ void print_time_logs(thread_properties * timeptr)
 	printf("Thread %d average jitter %f ns\n",timeptr->thread_id,timeptr->average_jitter_ms);
 }
 
-void* func_1(void* ptr)
+void function_end(uint8_t func_id)
 {
-	while(1)
-	{	
-		sem_wait(&(func_props[0].sem));
-		jitter_difference_start(&func_props[0]);
-		printf("\n\rPikachu\n\r");
-		jitter_difference_end(&func_props[0]);
-		print_time_logs(&func_props[0]);
-		sem_post(&func_props[1].sem);
+	jitter_difference_end(&func_props[func_id]);
+	print_time_logs(&func_props[func_id]);
+	if(func_id == TOTAL_THREADS-1)
+	{
+		func_id = 0;
 	}
-	pthread_exit(NULL);
+	else
+	{
+		func_id++;
+	}
+	sem_post(&(func_props[func_id].sem));
+	return;
 }
 
-void* func_2(void* ptr)
+void function_beginning(uint8_t func_id)
 {
-	while(1)
-	{	
-		sem_wait(&(func_props[1].sem));
-		jitter_difference_start(&func_props[1]);
-		printf("\n\rCharmander\n\r");
-		jitter_difference_end(&func_props[1]);
-		print_time_logs(&func_props[1]);
-		sem_post(&(func_props[2].sem));
-	}
-	pthread_exit(NULL);
+	sem_wait(&(func_props[func_id].sem));		
+	jitter_difference_start(&func_props[func_id]);
+	return;
 }
 
-void* func_3(void* ptr)
+void loop_condition_check(void)
 {
-	while(1)
-	{	
-		sem_wait(&(func_props[2].sem));
-		jitter_difference_start(&func_props[2]);
-		printf("\n\rSquirtle\n\r");
-		jitter_difference_end(&func_props[2]);
-		print_time_logs(&func_props[2]);
-		sem_post(&(func_props[3].sem));
+	static uint32_t iterations=0;
+	if(++iterations==TOTAL_CAPTURES)
+	{
+		loop_condition=False;
 	}
-	pthread_exit(NULL);
-}
-
-void* func_4(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[3].sem));
-		jitter_difference_start(&func_props[3]);
-		printf("\n\rBulbasaur\n\r");
-		jitter_difference_end(&func_props[3]);
-		print_time_logs(&func_props[3]);
-		sem_post(&(func_props[4].sem));
-	}
-	pthread_exit(NULL);
-}
-
-void* func_5(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[4].sem));
-		jitter_difference_start(&func_props[4]);
-		printf("\n\rPrimeape\n\r");
-		jitter_difference_end(&func_props[4]);
-		print_time_logs(&func_props[4]);
-		sem_post(&(func_props[5].sem));
-	}
-	pthread_exit(NULL);
-}
-
-void* func_6(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[5].sem));
-		jitter_difference_start(&func_props[5]);
-		printf("\n\rGengar\n\r");
-		jitter_difference_end(&func_props[5]);
-		print_time_logs(&func_props[5]);
-		sem_post(&(func_props[6].sem));
-	}
-	pthread_exit(NULL);
-}
-
-void* func_7(void* ptr)
-{
-	while(1)
-	{	
-		sem_wait(&(func_props[6].sem));
-		jitter_difference_start(&func_props[6]);
-		printf("\n\rSnorlax\n\r");
-		jitter_difference_end(&func_props[6]);
-		print_time_logs(&func_props[6]);
-		sem_post(&(func_props[0].sem));
-	}
-	pthread_exit(NULL);
-}
-
+	return;
+}	
 
 void thread_create(thread_properties* struct_pointer)
 {	
@@ -257,6 +207,94 @@ void thread_join(thread_properties* struct_pointer)
 {
 	pthread_join(struct_pointer->thread,NULL);
 }
+
+
+
+void* func_1(void* ptr)
+{
+	uint8_t func_id=0;
+	while(loop_condition)
+	{	
+		function_beginning(func_id);
+		printf("\n\rPikachu\n\r");
+		loop_condition_check();
+		function_end(func_id);
+	}
+	pthread_exit(NULL);
+}
+
+void* func_2(void* ptr)
+{
+	uint8_t func_id=1;
+	while(loop_condition)
+	{	
+		function_beginning(func_id);
+		printf("\n\rLapras\n\r");
+		function_end(func_id);
+	}
+	pthread_exit(NULL);
+}
+
+void* func_3(void* ptr)
+{
+	uint8_t func_id=2;
+	while(loop_condition)
+	{	
+		function_beginning(func_id);
+		printf("\n\rBulbasaur\n\r");
+		function_end(func_id);
+	}
+	pthread_exit(NULL);
+}
+
+void* func_4(void* ptr)
+{
+	uint8_t func_id=3;
+	while(loop_condition)
+	{	
+		function_beginning(func_id);
+		printf("\n\rCharmander\n\r");
+		function_end(func_id);
+	}
+	pthread_exit(NULL);
+}
+
+void* func_5(void* ptr)
+{
+	uint8_t func_id=4;
+	while(loop_condition)
+	{	
+		function_beginning(func_id);
+		printf("\n\rSquirtle\n\r");
+		function_end(func_id);
+	}
+	pthread_exit(NULL);
+}
+
+void* func_6(void* ptr)
+{
+	uint8_t func_id=5;
+	while(loop_condition)
+	{	
+		function_beginning(func_id);
+		printf("\n\rPrimeape\n\r");
+		function_end(func_id);
+	}
+	pthread_exit(NULL);
+}
+
+void* func_7(void* ptr)
+{
+	uint8_t func_id=6;
+	while(loop_condition)
+	{	
+		function_beginning(func_id);
+		printf("\n\rSnorlax\n\r");
+		function_end(func_id);
+	}
+	pthread_exit(NULL);
+}
+
 
 /***********************************************************************
   * @brief main()
