@@ -24,17 +24,24 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 10
+#define TOTAL_CAPTURES 60
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
+#define SCHEDULER_FREQ 30
 #define True 1
 #define False 0
 
+static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
+static uint8_t thread_frequency_array[TOTAL_THREADS]={0,4,3,2,1,42,21};
 
 typedef struct
-{
+{	
+	uint8_t thread_frequency = thread_frequency_array[thread_count];
 	uint8_t priority = MAX_PRIORITY - thread_count++;
 	uint8_t thread_id = thread_count;
+	uint8_t times_exe_per_sec=0;
+	uint8_t thread_live = False;
+	uint8_t exit_condition = False;
 	pthread_t thread;
 	sem_t sem;
 	pthread_attr_t attribute;
@@ -161,6 +168,8 @@ void jitter_difference_end(thread_properties * timeptr)
   ***********************************************************************/
 void print_time_logs(thread_properties * timeptr)
 {
+	cout<<"Seconds = "<<seconds_since_start<<"\n";
+	printf("Thread %d executed this second %d times\n",timeptr->thread_id,timeptr->times_exe_per_sec);
 	printf("Thread %d starts at %f ns\n",timeptr->thread_id,timeptr->start_ms);
 	printf("Thread %d stops  at %f ns\n",timeptr->thread_id,timeptr->stop_ms);
 	printf("Thread %d average execution time %f ns\n",timeptr->thread_id,timeptr->average_difference_ms);
@@ -181,7 +190,7 @@ void function_end(uint8_t func_id)
 	{
 		func_id++;
 	}
-	sem_post(&(func_props[func_id].sem));
+	sem_post(&(func_props[0].sem));
 	return;
 }
 
@@ -224,7 +233,7 @@ void thread_join(thread_properties* struct_pointer)
 
 void* func_1(void* ptr)
 {
-	uint8_t func_id=0;
+	uint8_t func_id=0,i=0,j=0;
 	uint32_t time_difference=0,value=0,prev_sec=1;
 	struct timespec time_check;
 	while(loop_condition)
@@ -234,13 +243,41 @@ void* func_1(void* ptr)
 		if((code_end_time.tv_nsec > THREADS_POST_TIME)&&(code_end_time.tv_nsec < 2*THREADS_POST_TIME)&&(code_end_time.tv_sec != prev_sec))
 		{
 			loop_condition_check();
+			seconds_since_start++;
 			prev_sec=code_end_time.tv_sec;
-			sem_post(&(func_props[1].sem));
-		}
-		else
-		{			
-			sem_post(&(func_props[0].sem));		
-		}
+			for(j=1;j<TOTAL_THREADS;j++)
+			{
+				func_props[j].times_exe_per_sec=0;
+			}
+			for(i=1;i<SCHEDULER_FREQ+1;i++)
+			{
+				for(j=1;j<TOTAL_THREADS;j++)
+				{
+					if(func_props[j].thread_frequency > 0)
+					{
+						if(func_props[j].thread_frequency > SCHEDULER_FREQ)
+						{
+							func_props[j].thread_frequency=SCHEDULER_FREQ;
+						}
+						if(i%(SCHEDULER_FREQ/func_props[j].thread_frequency)==0)
+						{
+							func_props[j].times_exe_per_sec++;
+							func_props[j].thread_live=True;
+							sem_post(&(func_props[j].sem));
+							sem_wait(&(func_props[0].sem));
+							func_props[j].thread_live=False;
+						}
+					}
+				}
+			}
+		}		
+		sem_post(&(func_props[0].sem));		
+	}
+	for(j=1;j<TOTAL_THREADS;j++)
+	{
+		func_props[j].exit_condition=True;
+		sem_post(&(func_props[j].sem));
+		sem_wait(&(func_props[0].sem));
 	}
 	pthread_exit(NULL);
 }
@@ -248,11 +285,18 @@ void* func_1(void* ptr)
 void* func_2(void* ptr)
 {
 	uint8_t func_id=1;
-	while(loop_condition)
+	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
-		printf("\n\rPikachu\n\r");
-		function_end(func_id);
+		if(!func_props[func_id].exit_condition)
+		{
+			printf("\n\rPikachu\n\r");
+			function_end(func_id);
+		}
+		else
+		{
+			sem_post(&(func_props[0].sem));
+		}
 	}
 	pthread_exit(NULL);
 }
@@ -260,11 +304,18 @@ void* func_2(void* ptr)
 void* func_3(void* ptr)
 {
 	uint8_t func_id=2;
-	while(loop_condition)
+	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
-		printf("\n\rBulbasaur\n\r");
-		function_end(func_id);
+		if(!func_props[func_id].exit_condition)
+		{
+			printf("\n\rBulbasaur\n\r");
+			function_end(func_id);
+		}
+		else
+		{
+			sem_post(&(func_props[0].sem));
+		}
 	}
 	pthread_exit(NULL);
 }
@@ -272,11 +323,18 @@ void* func_3(void* ptr)
 void* func_4(void* ptr)
 {
 	uint8_t func_id=3;
-	while(loop_condition)
+	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
-		printf("\n\rCharmander\n\r");
-		function_end(func_id);
+		if(!func_props[func_id].exit_condition)
+		{
+			printf("\n\rCharmander\n\r");
+			function_end(func_id);
+		}
+		else
+		{
+			sem_post(&(func_props[0].sem));
+		}
 	}
 	pthread_exit(NULL);
 }
@@ -284,11 +342,18 @@ void* func_4(void* ptr)
 void* func_5(void* ptr)
 {
 	uint8_t func_id=4;
-	while(loop_condition)
+	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
-		printf("\n\rSquirtle\n\r");
-		function_end(func_id);
+		if(!func_props[func_id].exit_condition)
+		{
+			printf("\n\rSquirtle\n\r");
+			function_end(func_id);
+		}
+		else
+		{
+			sem_post(&(func_props[0].sem));
+		}	
 	}
 	pthread_exit(NULL);
 }
@@ -296,11 +361,18 @@ void* func_5(void* ptr)
 void* func_6(void* ptr)
 {
 	uint8_t func_id=5;
-	while(loop_condition)
+	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
-		printf("\n\rPrimeape\n\r");
-		function_end(func_id);
+		if(!func_props[func_id].exit_condition)
+		{
+			printf("\n\rPrimeape\n\r");
+			function_end(func_id);
+		}
+		else
+		{
+			sem_post(&(func_props[0].sem));
+		}
 	}
 	pthread_exit(NULL);
 }
@@ -308,11 +380,18 @@ void* func_6(void* ptr)
 void* func_7(void* ptr)
 {
 	uint8_t func_id=6;
-	while(loop_condition)
+	while(loop_condition|func_props[func_id].thread_live)
 	{	
 		function_beginning(func_id);
-		printf("\n\rSnorlax\n\r");
-		function_end(func_id);
+		if(!func_props[func_id].exit_condition)
+		{
+			printf("\n\rSnorlax\n\r");
+			function_end(func_id);
+		}
+		else
+		{
+			sem_post(&(func_props[0].sem));
+		}
 	}
 	pthread_exit(NULL);
 }
