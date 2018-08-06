@@ -259,7 +259,7 @@ void* func_1(void* ptr)
 						{
 							func_props[j].thread_frequency=SCHEDULER_FREQ;
 						}
-						if(i%(SCHEDULER_FREQ/func_props[j].thread_frequency)==0)
+						if((i%(SCHEDULER_FREQ/func_props[j].thread_frequency)==0)&&(func_props[j].times_exe_per_sec < func_props[j].thread_frequency))
 						{
 							func_props[j].times_exe_per_sec++;
 							func_props[j].thread_live=True;
