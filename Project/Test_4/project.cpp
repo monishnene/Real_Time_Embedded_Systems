@@ -24,8 +24,8 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 60
-#define THREADS_POST_TIME (10*NSEC_PER_MSEC)
+#define TOTAL_CAPTURES 10
+#define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define True 1
 #define False 0
 
@@ -45,6 +45,8 @@ typedef struct
 	double start_ms=0;
 	double stop_ms=0;
 	double difference_ms=0;
+	double WCET_ms=0;
+	double average_difference_ms=0;
 	double accumulated_jitter_ms=0;
 	double average_jitter_ms=0;
 }thread_properties;
@@ -129,18 +131,26 @@ void jitter_difference_start(thread_properties * timeptr)
 void jitter_difference_end(thread_properties * timeptr)
 {
   	struct timespec fetched_time,delta_time;
-	double prev_difference = 0;
+	double prev_average_difference = 0;
 	clock_gettime(CLOCK_REALTIME, &fetched_time);
 	delta_t(&fetched_time, &code_start_time, &delta_time);
   	timeptr->stop_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
-	prev_difference = timeptr->difference_ms;
 	timeptr->difference_ms = double(timeptr->stop_ms - timeptr->start_ms);
+	if(timeptr->WCET_ms < timeptr->difference_ms)
+	{
+		timeptr->WCET_ms = timeptr->difference_ms;
+	}
 	timeptr->counter++;
 	if(timeptr->counter > 1)
 	{
-		timeptr->accumulated_jitter_ms += double(timeptr->difference_ms - prev_difference);
+		timeptr->accumulated_jitter_ms += double(timeptr->difference_ms - timeptr->average_difference_ms);
 		timeptr->average_jitter_ms = double(timeptr->accumulated_jitter_ms/ timeptr->counter);
-	}	
+		timeptr->average_difference_ms = double((timeptr->average_difference_ms*(timeptr->counter-1)+timeptr->difference_ms)/timeptr->counter);
+	}
+	else
+	{
+		timeptr->average_difference_ms = timeptr->difference_ms;
+	} 	
 	return; 	
 }
 
@@ -153,7 +163,8 @@ void print_time_logs(thread_properties * timeptr)
 {
 	printf("Thread %d starts at %f ns\n",timeptr->thread_id,timeptr->start_ms);
 	printf("Thread %d stops  at %f ns\n",timeptr->thread_id,timeptr->stop_ms);
-	printf("Thread %d Duration %f ns\n",timeptr->thread_id,timeptr->difference_ms);
+	printf("Thread %d average execution time %f ns\n",timeptr->thread_id,timeptr->average_difference_ms);
+	printf("Thread %d worst case execution time %f ns\n",timeptr->thread_id,timeptr->WCET_ms);
 	printf("Thread %d accumulated jitter %f ns\n",timeptr->thread_id,timeptr->accumulated_jitter_ms);
 	printf("Thread %d average jitter %f ns\n",timeptr->thread_id,timeptr->average_jitter_ms);
 }
