@@ -24,7 +24,8 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 2000
+#define TOTAL_CAPTURES 10
+#define THREADS_POST_TIME (20*NSEC_PER_MSEC)
 #define True 1
 #define False 0
 
@@ -48,7 +49,7 @@ typedef struct
 	double average_jitter_ms=0;
 }thread_properties;
 
-static struct timespec code_start_time;
+static struct timespec code_start_time,code_end_time,code_execution_time;
 
 static thread_properties func_props[TOTAL_THREADS];
 
@@ -169,7 +170,7 @@ void function_end(uint8_t func_id)
 	{
 		func_id++;
 	}
-	sem_post(&(func_props[func_id].sem));
+	sem_post(&(func_props[0].sem));
 	return;
 }
 
@@ -213,12 +214,50 @@ void thread_join(thread_properties* struct_pointer)
 void* func_1(void* ptr)
 {
 	uint8_t func_id=0;
+	uint32_t time_difference=0,value=0;
+	struct timespec time_check;
 	while(loop_condition)
 	{	
-		function_beginning(func_id);
-		printf("\n\rPikachu\n\r");
-		loop_condition_check();
-		function_end(func_id);
+		sem_wait(&(func_props[0].sem));
+		clock_gettime(CLOCK_REALTIME,&code_end_time); 
+		if((code_end_time.tv_nsec > THREADS_POST_TIME)&&(code_end_time.tv_nsec < TOTAL_THREADS*THREADS_POST_TIME))
+		{
+			time_difference = code_end_time.tv_nsec - THREADS_POST_TIME;
+			value = (time_difference % THREADS_POST_TIME) + 1;
+			if(value < TOTAL_THREADS)
+			{
+
+				if(func_id == TOTAL_THREADS-1)
+				{
+					loop_condition_check();
+					if(loop_condition)
+					{
+						func_id = 1;
+						sem_post(&(func_props[func_id].sem));
+					}
+					else
+					{					
+						clock_gettime(CLOCK_REALTIME,&code_end_time); 
+						delta_t(&code_end_time, &code_start_time, &code_execution_time);
+						cout<<"\n\nCode Execution Time = "<<code_execution_time.tv_sec<<" seconds "<<code_execution_time.tv_nsec<<" nano seconds.\n";
+						exit(-1);
+					}
+				}
+				else
+				{
+					func_id++;
+					sem_post(&(func_props[func_id].sem));
+				}
+			}
+			else
+			{
+				sem_post(&(func_props[0].sem));	
+			}
+		}
+		else
+		{			
+			sem_post(&(func_props[0].sem));		
+		}
 	}
 	pthread_exit(NULL);
 }
@@ -229,7 +268,7 @@ void* func_2(void* ptr)
 	while(loop_condition)
 	{	
 		function_beginning(func_id);
-		printf("\n\rLapras\n\r");
+		printf("\n\rPikachu\n\r");
 		function_end(func_id);
 	}
 	pthread_exit(NULL);
@@ -303,7 +342,7 @@ void* func_7(void* ptr)
 int main(int argc, char** argv)
 {
 	uint8_t i=0;
-	clock_gettime(CLOCK_REALTIME,&code_start_time); 
+	clock_gettime(CLOCK_REALTIME,&code_start_time);
 	func_props[0].function_pointer = func_1; 
 	func_props[1].function_pointer = func_2; 
 	func_props[2].function_pointer = func_3; 
@@ -315,7 +354,7 @@ int main(int argc, char** argv)
 	{
 		thread_create(&func_props[i]);
 	}
-	sem_post(&(func_props[0].sem));
+	sem_post(&(func_props[0].sem)); 
 	for(i=0;i<TOTAL_THREADS;i++)
 	{
 		thread_join(&func_props[i]);
