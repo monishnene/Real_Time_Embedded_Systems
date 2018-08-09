@@ -24,7 +24,7 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 60
+#define TOTAL_CAPTURES 10
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define SCHEDULER_FREQ 30
 #define True 1
@@ -33,7 +33,7 @@ using namespace std;
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
 static uint8_t thread_frequency_array[TOTAL_THREADS]={0,4,3,2,1,42,21};
-sem_print_time_logs;
+sem_t sem_print_time_logs;
 
 typedef struct
 {	
@@ -60,8 +60,6 @@ typedef struct
 	struct timespec delta_time={0,0};
 }thread_properties;
 
-static struct timespec code_start_time,code_end_time,code_execution_time;
-static thread_properties func_props[TOTAL_THREADS];
 uint8_t title_1[]="\nSequencer\n";
 uint8_t title_2[]="\nPikachu\n";
 uint8_t title_3[]="\nBulbsaur\n";
@@ -69,7 +67,6 @@ uint8_t title_4[]="\nCharmander\n";
 uint8_t title_5[]="\nSquirtle\n";
 uint8_t title_6[]="\nPrimeape\n";
 uint8_t title_7[]="\nSnorlax\n";
-}thread_properties;
 
 static struct timespec code_start_time,code_end_time,code_execution_time;
 
