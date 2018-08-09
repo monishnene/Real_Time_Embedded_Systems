@@ -392,6 +392,7 @@ void* func_7(void* ptr)
 		else
 		{
 			sem_post(&(func_props[0].sem));
+			stuff=0;
 		}
 	}
 	pthread_exit(NULL);

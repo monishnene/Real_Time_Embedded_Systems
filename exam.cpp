@@ -23,17 +23,16 @@ using namespace std;
 #define OK (0)
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
-#define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 60
+#define TOTAL_THREADS 3
+#define TOTAL_CAPTURES 10
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
-#define SCHEDULER_FREQ 30
+#define SCHEDULER_FREQ 40
 #define True 1
 #define False 0
 
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
-static uint8_t thread_frequency_array[TOTAL_THREADS]={0,4,3,2,1,42,21};
-uint32_t message_queue
+static uint8_t thread_frequency_array[TOTAL_THREADS]={0,5,1};
 
 typedef struct
 {	
@@ -232,7 +231,7 @@ void thread_join(thread_properties* struct_pointer)
 
 
 
-void* func_1(void* ptr)
+void* sequencer(void* ptr)
 {
 	uint8_t func_id=0,i=0,j=0;
 	uint32_t time_difference=0,value=0,prev_sec=1;
@@ -283,7 +282,7 @@ void* func_1(void* ptr)
 	pthread_exit(NULL);
 }
 
-void* func_2(void* ptr)
+void* S1(void* ptr)
 {
 	uint8_t func_id=1;
 	while((loop_condition)||(func_props[func_id].thread_live))
@@ -302,7 +301,7 @@ void* func_2(void* ptr)
 	pthread_exit(NULL);
 }
 
-void* func_3(void* ptr)
+void* W1(void* ptr)
 {
 	uint8_t func_id=2;
 	while((loop_condition)||(func_props[func_id].thread_live))
@@ -321,7 +320,7 @@ void* func_3(void* ptr)
 	pthread_exit(NULL);
 }
 
-void* func_4(void* ptr)
+void* W2(void* ptr)
 {
 	uint8_t func_id=3;
 	while((loop_condition)||(func_props[func_id].thread_live))
@@ -340,64 +339,6 @@ void* func_4(void* ptr)
 	pthread_exit(NULL);
 }
 
-void* func_5(void* ptr)
-{
-	uint8_t func_id=4;
-	while((loop_condition)||(func_props[func_id].thread_live))
-	{	
-		function_beginning(func_id);
-		if(!func_props[func_id].exit_condition)
-		{
-			printf("\n\rSquirtle\n\r");
-			function_end(func_id);
-		}
-		else
-		{
-			sem_post(&(func_props[0].sem));
-		}	
-	}
-	pthread_exit(NULL);
-}
-
-void* func_6(void* ptr)
-{
-	uint8_t func_id=5;
-	while((loop_condition)||(func_props[func_id].thread_live))
-	{	
-		function_beginning(func_id);
-		if(!func_props[func_id].exit_condition)
-		{
-			printf("\n\rPrimeape\n\r");
-			function_end(func_id);
-		}
-		else
-		{
-			sem_post(&(func_props[0].sem));
-		}
-	}
-	pthread_exit(NULL);
-}
-
-void* func_7(void* ptr)
-{
-	uint8_t func_id=6;
-	while(loop_condition|func_props[func_id].thread_live)
-	{	
-		function_beginning(func_id);
-		if(!func_props[func_id].exit_condition)
-		{
-			printf("\n\rSnorlax\n\r");
-			function_end(func_id);
-		}
-		else
-		{
-			sem_post(&(func_props[0].sem));
-		}
-	}
-	pthread_exit(NULL);
-}
-
-
 /***********************************************************************
   * @brief main()
   * initialize variables and threads
@@ -406,13 +347,10 @@ int main(int argc, char** argv)
 {
 	uint8_t i=0;
 	clock_gettime(CLOCK_REALTIME,&code_start_time);
-	func_props[0].function_pointer = func_1; 
+	func_props[0].function_pointer = sequencer; 
 	func_props[1].function_pointer = func_2; 
 	func_props[2].function_pointer = func_3; 
 	func_props[3].function_pointer = func_4;
-	func_props[4].function_pointer = func_5;
-	func_props[5].function_pointer = func_6;
-	func_props[6].function_pointer = func_7;
 	for(i=0;i<TOTAL_THREADS;i++)
 	{
 		thread_create(&func_props[i]);
