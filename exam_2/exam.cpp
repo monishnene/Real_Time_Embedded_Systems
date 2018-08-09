@@ -23,18 +23,20 @@ using namespace std;
 #define OK (0)
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
-#define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 60
+#define TOTAL_THREADS 3
+#define TOTAL_CAPTURES 10
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
-#define SCHEDULER_FREQ 30
+#define SCHEDULER_FREQ 40
 #define True 1
 #define False 0
 
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
-static uint8_t thread_frequency_array[TOTAL_THREADS]={0,4,3,2,1,42,21};
-uint32_t message_queue
-
+static uint8_t thread_frequency_array[TOTAL_THREADS]={0,5,1};
+int32_t message_queue_1[400];
+int32_t message_queue_2[50];
+int32_t message_queue_3[10];
+uint32_t qS1=0,q1W1=0,q2W2=0,q2W1=0,q3W2=0;
 typedef struct
 {	
 	uint8_t thread_frequency = thread_frequency_array[thread_count];
@@ -57,6 +59,7 @@ typedef struct
 	double average_difference_ms=0;
 	double accumulated_jitter_ms=0;
 	double average_jitter_ms=0;
+	struct timespec delta_time={0,0};
 }thread_properties;
 
 static struct timespec code_start_time,code_end_time,code_execution_time;
@@ -123,10 +126,10 @@ void delta_t(struct timespec *stop, struct timespec *start, struct timespec *del
   ***********************************************************************/
 void jitter_difference_start(thread_properties * timeptr)
 {
-	struct timespec fetched_time,delta_time;
+	struct timespec fetched_time;
 	clock_gettime(CLOCK_REALTIME, &fetched_time);
-	delta_t(&fetched_time, &code_start_time, &delta_time);
-  	timeptr->start_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
+	delta_t(&fetched_time, &code_start_time, &(timeptr->delta_time));
+  	timeptr->start_ms = double(timeptr->delta_time.tv_sec*NSEC_PER_SEC + timeptr->delta_time.tv_nsec);
 	return;
 }
 
@@ -138,11 +141,11 @@ void jitter_difference_start(thread_properties * timeptr)
   ***********************************************************************/
 void jitter_difference_end(thread_properties * timeptr)
 {
-  	struct timespec fetched_time,delta_time;
+  	struct timespec fetched_time,delta_2_time;
 	double prev_average_difference = 0;
 	clock_gettime(CLOCK_REALTIME, &fetched_time);
-	delta_t(&fetched_time, &code_start_time, &delta_time);
-  	timeptr->stop_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
+	delta_t(&fetched_time, &code_start_time, &delta_2_time);
+  	timeptr->stop_ms = double(delta_2_time.tv_sec*NSEC_PER_SEC + delta_2_time.tv_nsec);
 	timeptr->difference_ms = double(timeptr->stop_ms - timeptr->start_ms);
 	if(timeptr->WCET_ms < timeptr->difference_ms)
 	{
@@ -169,7 +172,7 @@ void jitter_difference_end(thread_properties * timeptr)
   ***********************************************************************/
 void print_time_logs(thread_properties * timeptr)
 {
-	cout<<"Seconds = "<<seconds_since_start<<"\n";
+	printf("\nTime since start seconds = %ld nanoseconds = %ld \n",timeptr->delta_time.tv_sec,timeptr->delta_time.tv_nsec);
 	printf("Thread %d executed this second %d times\n",timeptr->thread_id,timeptr->times_exe_per_sec);
 	printf("Thread %d starts at %f ns\n",timeptr->thread_id,timeptr->start_ms);
 	printf("Thread %d stops  at %f ns\n",timeptr->thread_id,timeptr->stop_ms);
@@ -232,7 +235,7 @@ void thread_join(thread_properties* struct_pointer)
 
 
 
-void* func_1(void* ptr)
+void* S1(void* ptr)
 {
 	uint8_t func_id=0,i=0,j=0;
 	uint32_t time_difference=0,value=0,prev_sec=1;
@@ -252,6 +255,7 @@ void* func_1(void* ptr)
 			}
 			for(i=1;i<SCHEDULER_FREQ+1;i++)
 			{
+				message_queue_1[qS1++]=rand();
 				for(j=1;j<TOTAL_THREADS;j++)
 				{
 					if(func_props[j].thread_frequency > 0)
@@ -283,15 +287,21 @@ void* func_1(void* ptr)
 	pthread_exit(NULL);
 }
 
-void* func_2(void* ptr)
+void* W1(void* ptr)
 {
-	uint8_t func_id=1;
+	uint8_t func_id=1,i=0;
+	long average=0;
 	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rPikachu\n\r");
+			for(i=0;i<8;i++)
+			{
+				average+=message_queue_1[q1W1+i];
+			}
+			q1W1+=8;
+			message_queue_2[q2W1++]=average/8;
 			function_end(func_id);
 		}
 		else
@@ -302,97 +312,38 @@ void* func_2(void* ptr)
 	pthread_exit(NULL);
 }
 
-void* func_3(void* ptr)
+void* W2(void* ptr)
 {
-	uint8_t func_id=2;
+	uint32_t func_id=2,i=0;
+	long average=0,big_average=0,full_average=0;
 	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rBulbasaur\n\r");
+			for(i=0;i<5;i++)
+			{
+				average+=message_queue_2[q2W2+i];
+			}
+			q2W2+=5;
+			message_queue_3[q3W2++]=average/10;
 			function_end(func_id);
 		}
 		else
 		{
+			for(i=0;i<10;i++)
+			{
+				big_average+=message_queue_3[i];
+			}
+			big_average/=10;
+			cout<<"Full average by W2 = "<< big_average;
+			for(i=0;i<400;i++)
+			{
+				full_average+=message_queue_1[i];
+			}
+			full_average/=10;
+			cout<<"Full average by total = "<< full_average;
 			sem_post(&(func_props[0].sem));
-		}
-	}
-	pthread_exit(NULL);
-}
-
-void* func_4(void* ptr)
-{
-	uint8_t func_id=3;
-	while((loop_condition)||(func_props[func_id].thread_live))
-	{	
-		function_beginning(func_id);
-		if(!func_props[func_id].exit_condition)
-		{
-			printf("\n\rCharmander\n\r");
-			function_end(func_id);
-		}
-		else
-		{
-			sem_post(&(func_props[0].sem));
-		}
-	}
-	pthread_exit(NULL);
-}
-
-void* func_5(void* ptr)
-{
-	uint8_t func_id=4;
-	while((loop_condition)||(func_props[func_id].thread_live))
-	{	
-		function_beginning(func_id);
-		if(!func_props[func_id].exit_condition)
-		{
-			printf("\n\rSquirtle\n\r");
-			function_end(func_id);
-		}
-		else
-		{
-			sem_post(&(func_props[0].sem));
-		}	
-	}
-	pthread_exit(NULL);
-}
-
-void* func_6(void* ptr)
-{
-	uint8_t func_id=5;
-	while((loop_condition)||(func_props[func_id].thread_live))
-	{	
-		function_beginning(func_id);
-		if(!func_props[func_id].exit_condition)
-		{
-			printf("\n\rPrimeape\n\r");
-			function_end(func_id);
-		}
-		else
-		{
-			sem_post(&(func_props[0].sem));
-		}
-	}
-	pthread_exit(NULL);
-}
-
-void* func_7(void* ptr)
-{
-	uint8_t func_id=6;
-	while(loop_condition|func_props[func_id].thread_live)
-	{	
-		function_beginning(func_id);
-		if(!func_props[func_id].exit_condition)
-		{
-			printf("\n\rSnorlax\n\r");
-			function_end(func_id);
-		}
-		else
-		{
-			sem_post(&(func_props[0].sem));
-			stuff=0;
 		}
 	}
 	pthread_exit(NULL);
@@ -407,13 +358,10 @@ int main(int argc, char** argv)
 {
 	uint8_t i=0;
 	clock_gettime(CLOCK_REALTIME,&code_start_time);
-	func_props[0].function_pointer = func_1; 
-	func_props[1].function_pointer = func_2; 
-	func_props[2].function_pointer = func_3; 
-	func_props[3].function_pointer = func_4;
-	func_props[4].function_pointer = func_5;
-	func_props[5].function_pointer = func_6;
-	func_props[6].function_pointer = func_7;
+	srand(code_start_time.tv_sec);
+	func_props[0].function_pointer = S1; 
+	func_props[1].function_pointer = W1; 
+	func_props[2].function_pointer = W2; 
 	for(i=0;i<TOTAL_THREADS;i++)
 	{
 		thread_create(&func_props[i]);
