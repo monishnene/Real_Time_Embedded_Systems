@@ -33,7 +33,7 @@ using namespace std;
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
 static uint8_t thread_frequency_array[TOTAL_THREADS]={0,4,3,2,1,42,21};
-uint32_t message_queue
+sem_t sem_print_time_logs;
 
 typedef struct
 {	
@@ -57,11 +57,18 @@ typedef struct
 	double average_difference_ms=0;
 	double accumulated_jitter_ms=0;
 	double average_jitter_ms=0;
+	struct timespec delta_time={0,0};
 }thread_properties;
 
 static struct timespec code_start_time,code_end_time,code_execution_time;
-
 static thread_properties func_props[TOTAL_THREADS];
+uint8_t title_1[]="\nSequencer\n";
+uint8_t title_2[]="\nPikachu\n";
+uint8_t title_3[]="\nBulbsaur\n";
+uint8_t title_4[]="\nCharmander\n";
+uint8_t title_5[]="\nSquirtle\n";
+uint8_t title_6[]="\nPrimeape\n";
+uint8_t title_7[]="\nSnorlax\n";
 
 void delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t);
 void jitter_difference_start(thread_properties * timeptr);
@@ -123,13 +130,12 @@ void delta_t(struct timespec *stop, struct timespec *start, struct timespec *del
   ***********************************************************************/
 void jitter_difference_start(thread_properties * timeptr)
 {
-	struct timespec fetched_time,delta_time;
+	struct timespec fetched_time;
 	clock_gettime(CLOCK_REALTIME, &fetched_time);
-	delta_t(&fetched_time, &code_start_time, &delta_time);
-  	timeptr->start_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
+	delta_t(&fetched_time, &code_start_time, &(timeptr->delta_time));
+  	timeptr->start_ms = double(timeptr->delta_time.tv_sec*NSEC_PER_SEC + timeptr->delta_time.tv_nsec);
 	return;
 }
-
 
 /***********************************************************************
   * @brief jitter_difference_end()
@@ -138,11 +144,11 @@ void jitter_difference_start(thread_properties * timeptr)
   ***********************************************************************/
 void jitter_difference_end(thread_properties * timeptr)
 {
-  	struct timespec fetched_time,delta_time;
+  	struct timespec fetched_time,delta_2_time;
 	double prev_average_difference = 0;
 	clock_gettime(CLOCK_REALTIME, &fetched_time);
-	delta_t(&fetched_time, &code_start_time, &delta_time);
-  	timeptr->stop_ms = double(delta_time.tv_sec*NSEC_PER_SEC + delta_time.tv_nsec);
+	delta_t(&fetched_time, &code_start_time, &delta_2_time);
+  	timeptr->stop_ms = double(delta_2_time.tv_sec*NSEC_PER_SEC + delta_2_time.tv_nsec);
 	timeptr->difference_ms = double(timeptr->stop_ms - timeptr->start_ms);
 	if(timeptr->WCET_ms < timeptr->difference_ms)
 	{
@@ -169,7 +175,9 @@ void jitter_difference_end(thread_properties * timeptr)
   ***********************************************************************/
 void print_time_logs(thread_properties * timeptr)
 {
-	cout<<"Seconds = "<<seconds_since_start<<"\n";
+	sem_wait(&sem_print_time_logs);
+	cout<<timeptr->title;
+	printf("\nTime since start of code = %ld seconds %ld nanoseconds\n",timeptr->delta_time.tv_sec,timeptr->delta_time.tv_nsec);
 	printf("Thread %d executed this second %d times\n",timeptr->thread_id,timeptr->times_exe_per_sec);
 	printf("Thread %d starts at %f ns\n",timeptr->thread_id,timeptr->start_ms);
 	printf("Thread %d stops  at %f ns\n",timeptr->thread_id,timeptr->stop_ms);
@@ -177,6 +185,7 @@ void print_time_logs(thread_properties * timeptr)
 	printf("Thread %d worst case execution time %f ns\n",timeptr->thread_id,timeptr->WCET_ms);
 	printf("Thread %d accumulated jitter %f ns\n",timeptr->thread_id,timeptr->accumulated_jitter_ms);
 	printf("Thread %d average jitter %f ns\n",timeptr->thread_id,timeptr->average_jitter_ms);
+	sem_post(&sem_print_time_logs);
 }
 
 void function_end(uint8_t func_id)
@@ -191,7 +200,6 @@ void function_end(uint8_t func_id)
 	{
 		func_id++;
 	}
-	sem_post(&(func_props[0].sem));
 	return;
 }
 
@@ -239,7 +247,6 @@ void* func_1(void* ptr)
 	struct timespec time_check;
 	while(loop_condition)
 	{	
-		sem_wait(&(func_props[0].sem));
 		clock_gettime(CLOCK_REALTIME,&code_end_time);
 		if((code_end_time.tv_nsec > THREADS_POST_TIME)&&(code_end_time.tv_nsec < 2*THREADS_POST_TIME)&&(code_end_time.tv_sec != prev_sec))
 		{
@@ -265,7 +272,6 @@ void* func_1(void* ptr)
 							func_props[j].times_exe_per_sec++;
 							func_props[j].thread_live=True;
 							sem_post(&(func_props[j].sem));
-							sem_wait(&(func_props[0].sem));
 							func_props[j].thread_live=False;
 						}
 					}
@@ -278,7 +284,6 @@ void* func_1(void* ptr)
 	{
 		func_props[j].exit_condition=True;
 		sem_post(&(func_props[j].sem));
-		sem_wait(&(func_props[0].sem));
 	}
 	pthread_exit(NULL);
 }
@@ -291,7 +296,6 @@ void* func_2(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rPikachu\n\r");
 			function_end(func_id);
 		}
 		else
@@ -310,7 +314,6 @@ void* func_3(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rBulbasaur\n\r");
 			function_end(func_id);
 		}
 		else
@@ -329,7 +332,6 @@ void* func_4(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rCharmander\n\r");
 			function_end(func_id);
 		}
 		else
@@ -348,7 +350,6 @@ void* func_5(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rSquirtle\n\r");
 			function_end(func_id);
 		}
 		else
@@ -367,7 +368,6 @@ void* func_6(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rPrimeape\n\r");
 			function_end(func_id);
 		}
 		else
@@ -386,18 +386,39 @@ void* func_7(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			printf("\n\rSnorlax\n\r");
 			function_end(func_id);
 		}
 		else
 		{
 			sem_post(&(func_props[0].sem));
-			stuff=0;
 		}
 	}
 	pthread_exit(NULL);
 }
 
+void struct_settings(void)
+{
+	func_props[0].title=title_1;
+	func_props[1].title=title_2;
+	func_props[2].title=title_3;
+	func_props[3].title=title_4;
+	func_props[4].title=title_5;
+	func_props[5].title=title_6;
+	func_props[6].title=title_7;
+	func_props[0].function_pointer = func_1; 
+	func_props[1].function_pointer = func_2; 
+	func_props[2].function_pointer = func_3; 
+	func_props[3].function_pointer = func_4;
+	func_props[4].function_pointer = func_5;
+	func_props[5].function_pointer = func_6;
+	func_props[6].function_pointer = func_7;
+}
+
+void sem_settings(void)
+{
+	sem_post(&(func_props[0].sem));
+	sem_init(&sem_print_time_logs,0,1);
+}
 
 /***********************************************************************
   * @brief main()
@@ -407,18 +428,12 @@ int main(int argc, char** argv)
 {
 	uint8_t i=0;
 	clock_gettime(CLOCK_REALTIME,&code_start_time);
-	func_props[0].function_pointer = func_1; 
-	func_props[1].function_pointer = func_2; 
-	func_props[2].function_pointer = func_3; 
-	func_props[3].function_pointer = func_4;
-	func_props[4].function_pointer = func_5;
-	func_props[5].function_pointer = func_6;
-	func_props[6].function_pointer = func_7;
+	struct_settings();
 	for(i=0;i<TOTAL_THREADS;i++)
 	{
 		thread_create(&func_props[i]);
 	}
-	sem_post(&(func_props[0].sem)); 
+	sem_settings();
 	for(i=0;i<TOTAL_THREADS;i++)
 	{
 		thread_join(&func_props[i]);
