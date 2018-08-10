@@ -12,11 +12,19 @@
 #include <stdlib.h>
 #include <iostream>
 #include <time.h>
+#include <stdbool.h>
+
 #include <sys/param.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+
+#include <sched.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <mqueue.h>
 
 #include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
@@ -34,11 +42,20 @@ using namespace std;
 #define SCHEDULER_FREQ 30
 #define True 1
 #define False 0
+#define ON 0
+#define OFF 1
+#define VRES 480
+#define HRES 640
 
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
-static uint8_t thread_frequency_array[TOTAL_THREADS]={0,4,3,2,1,2,1};
+static uint8_t thread_frequency_array[TOTAL_THREADS]={0,1,1,1,0,0,0};
 sem_t sem_print_time_logs;
+
+//opencv Declarations
+//IplImage* frame;
+//CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY);
+uint8_t* image_pointer;
 
 typedef struct
 {	
@@ -66,15 +83,14 @@ typedef struct
 }thread_properties;
 
 uint8_t title_1[]="\nSequencer\n";
-uint8_t title_2[]="\nPikachu\n";
-uint8_t title_3[]="\nBulbsaur\n";
-uint8_t title_4[]="\nCharmander\n";
+uint8_t title_2[]="\nCapture image.\n";
+uint8_t title_3[]="\nSave PPM image.\n";
+uint8_t title_4[]="\nJPEG compression of PPM image\n";
 uint8_t title_5[]="\nSquirtle\n";
 uint8_t title_6[]="\nPrimeape\n";
 uint8_t title_7[]="\nSnorlax\n";
 
 static struct timespec code_start_time,code_end_time,code_execution_time;
-
 static thread_properties func_props[TOTAL_THREADS];
 
 //Function Prototypes
@@ -220,7 +236,7 @@ void function_beginning(uint8_t func_id)
 void loop_condition_check(void)
 {
 	static uint32_t iterations=0;
-	if(++iterations==TOTAL_CAPTURES)
+	if(iterations++==TOTAL_CAPTURES)
 	{
 		loop_condition=False;
 	}
@@ -303,6 +319,8 @@ void* func_2(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
+			//camera = (CvCapture *)cvCreateCameraCapture(ON);
+			frame = cvQueryFrame(camera); 
 			function_end(func_id);
 		}
 	}
@@ -311,12 +329,20 @@ void* func_2(void* ptr)
 
 void* func_3(void* ptr)
 {
+	//Mat frame_2 ;
 	uint8_t func_id=2;
+	ostringstream file_name;
+    	vector<int> ppm_settings;
+    	ppm_settings.push_back(CV_IMWRITE_PXM_BINARY);
+    	ppm_settings.push_back(1);
 	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
+			file_name.str("");	
+			file_name<<func_props[func_id].counter<<".ppm";
+			//imwrite(file_name.str(),frame_2,ppm_settings);
 			function_end(func_id);
 		}
 	}
@@ -326,11 +352,15 @@ void* func_3(void* ptr)
 void* func_4(void* ptr)
 {
 	uint8_t func_id=3;
+	ostringstream file_name;
 	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
+			file_name.str("");	
+			file_name<<func_props[func_id].counter<<".jpg";
+			//cvSaveImage(file_name.str(),frame);
 			function_end(func_id);
 		}
 	}
@@ -411,6 +441,8 @@ int main(int argc, char** argv)
 {
 	uint8_t i=0;
 	clock_gettime(CLOCK_REALTIME,&code_start_time);
+	//cvSetCaptureProperty(camera, CV_CAP_PROP_FRAME_WIDTH, HRES);
+	//cvSetCaptureProperty(camera, CV_CAP_PROP_FRAME_HEIGHT, VRES);
 	struct_settings();
 	func_props[0].function_pointer = func_1; 
 	func_props[1].function_pointer = func_2; 
@@ -428,6 +460,7 @@ int main(int argc, char** argv)
 	{
 		thread_join(&func_props[i]);
 	}
+	cvReleaseCapture(&camera);
 	clock_gettime(CLOCK_REALTIME,&code_end_time); 
 	delta_t(&code_end_time, &code_start_time, &code_execution_time);
 	cout<<"\n\nCode Execution Time = "<<code_execution_time.tv_sec<<" seconds "<<code_execution_time.tv_nsec<<" nano seconds.\n";

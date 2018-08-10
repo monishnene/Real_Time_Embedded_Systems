@@ -32,7 +32,7 @@ using namespace std;
 
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
-static uint8_t thread_frequency_array[TOTAL_THREADS]={0,4,3,2,1,2,1};
+static uint8_t thread_frequency_array[TOTAL_THREADS]={0,1,1,1,0,0,0};
 sem_t sem_print_time_logs;
 
 typedef struct
@@ -215,7 +215,7 @@ void function_beginning(uint8_t func_id)
 void loop_condition_check(void)
 {
 	static uint32_t iterations=0;
-	if(++iterations==TOTAL_CAPTURES)
+	if(iterations++==TOTAL_CAPTURES)
 	{
 		loop_condition=False;
 	}
@@ -269,7 +269,7 @@ void* func_1(void* ptr)
 						{
 							func_props[j].thread_frequency=SCHEDULER_FREQ;
 						}
-						if((i%(SCHEDULER_FREQ/func_props[j].thread_frequency)==0)&&(func_props[j].times_exe_per_sec < func_props[j].thread_frequency))
+						if((i%(SCHEDULER_FREQ/func_props[j].thread_frequency)==0)&&(func_props[j].times_exe_per_sec <= func_props[j].thread_frequency))
 						{
 							func_props[j].times_exe_per_sec++;
 							func_props[j].thread_live=True;
