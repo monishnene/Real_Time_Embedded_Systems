@@ -16,6 +16,11 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
+using namespace cv;
 using namespace std;
 
 #define MAX_PRIORITY  sched_get_priority_max(SCHED_FIFO)
@@ -72,6 +77,7 @@ static struct timespec code_start_time,code_end_time,code_execution_time;
 
 static thread_properties func_props[TOTAL_THREADS];
 
+//Function Prototypes
 void delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t);
 void jitter_difference_start(thread_properties * timeptr);
 void jitter_difference_end(thread_properties * timeptr);
@@ -81,7 +87,6 @@ void function_beginning(uint8_t func_id);
 void loop_condition_check(void);
 void thread_create(thread_properties* struct_pointer);
 void thread_join(thread_properties* struct_pointer);
-
 
 /***********************************************************************
   * @brief delta_t()
