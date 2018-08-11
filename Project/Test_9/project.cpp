@@ -284,6 +284,7 @@ void  save_ppm(uint32_t count)
 	ostringstream file_name;
 	file_name.str("");	
 	file_name<<count<<".ppm";
+	putText(frame_ppm,"Monish",Point(480,470),FONT_HERSHEY_COMPLEX_SMALL,0.5,Scalar(0,128,255),1);
 	imwrite(file_name.str(),frame_ppm,ppm_settings);
 	sem_post(&sem_ppm_done);
 	sem_post(&sem_ppm);
@@ -310,7 +311,7 @@ void* func_1(void* ptr)
 	while(loop_condition)
 	{	
 		clock_gettime(CLOCK_REALTIME,&code_end_time);
-		if((code_end_time.tv_sec != prev_sec))
+		if((code_end_time.tv_nsec > THREADS_POST_TIME)&&(code_end_time.tv_nsec < 2*THREADS_POST_TIME)&&(code_end_time.tv_sec != prev_sec))
 		{
 			loop_condition_check();
 			seconds_since_start++;
