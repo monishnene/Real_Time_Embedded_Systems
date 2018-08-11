@@ -37,7 +37,7 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 100
+#define TOTAL_CAPTURES 500
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define SCHEDULER_FREQ 30
 #define True 1
