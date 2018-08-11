@@ -50,12 +50,15 @@ using namespace std;
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
 static uint8_t thread_frequency_array[TOTAL_THREADS]={0,1,1,1,0,0,0};
-sem_t sem_print_time_logs;
 
-//opencv Declarations
-//IplImage* frame;
-//CvCapture* camera = cvCaptureFromCAM(CV_CAP_ANY);
-uint8_t* image_pointer;
+sem_t sem_print_time_logs;
+sem_t sem_capture;
+sem_t sem_ppm;
+sem_t sem_jpg;
+
+vector<int> ppm_settings;
+vector<int> jpg_settings;
+Mat frame(VRES,HRES,CV_8UC3);	
 
 typedef struct
 {	
@@ -261,7 +264,35 @@ void thread_join(thread_properties* struct_pointer)
 	pthread_join(struct_pointer->thread,NULL);
 }
 
+void image_capture(void)
+{
+	sem_wait(&sem_capture);
+	VideoCapture camera(0);
+	camera.open(False);
+	camera >> frame;
+	camera.release();
+	sem_post(&sem_capture);
+}
 
+void  save_ppm(uint32_t count)
+{
+	sem_wait(&sem_ppm);
+	ostringstream file_name;
+	file_name.str("");	
+	file_name<<count<<".ppm";
+	imwrite(file_name.str(),frame,ppm_settings);
+	sem_post(&sem_ppm);
+}
+
+void save_jpg(uint32_t count)
+{
+	sem_wait(&sem_jpg);
+	ostringstream file_name;
+	file_name.str("");	
+	file_name<<count<<".jpg";
+	imwrite(file_name.str(),frame,jpg_settings);
+	sem_post(&sem_jpg);
+}
 
 void* func_1(void* ptr)
 {
@@ -318,10 +349,9 @@ void* func_2(void* ptr)
 	{	
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
-		{
-			//camera = (CvCapture *)cvCreateCameraCapture(ON);
-			frame = cvQueryFrame(camera); 
-			function_end(func_id);
+		{	
+			image_capture();
+			function_end(func_id);		
 		}
 	}
 	pthread_exit(NULL);
@@ -329,20 +359,13 @@ void* func_2(void* ptr)
 
 void* func_3(void* ptr)
 {
-	//Mat frame_2 ;
 	uint8_t func_id=2;
-	ostringstream file_name;
-    	vector<int> ppm_settings;
-    	ppm_settings.push_back(CV_IMWRITE_PXM_BINARY);
-    	ppm_settings.push_back(1);
 	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
-		{
-			file_name.str("");	
-			file_name<<func_props[func_id].counter<<".ppm";
-			//imwrite(file_name.str(),frame_2,ppm_settings);
+		{	
+			save_ppm(func_props[func_id].counter);
 			function_end(func_id);
 		}
 	}
@@ -352,15 +375,12 @@ void* func_3(void* ptr)
 void* func_4(void* ptr)
 {
 	uint8_t func_id=3;
-	ostringstream file_name;
 	while((loop_condition)||(func_props[func_id].thread_live))
 	{	
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
-			file_name.str("");	
-			file_name<<func_props[func_id].counter<<".jpg";
-			//cvSaveImage(file_name.str(),frame);
+			save_jpg(func_props[func_id].counter);
 			function_end(func_id);
 		}
 	}
@@ -431,6 +451,21 @@ void sem_settings(void)
 {
 	sem_post(&(func_props[0].sem));
 	sem_init(&sem_print_time_logs,0,1);
+	sem_init(&sem_capture,0,1);
+	sem_init(&sem_ppm,0,1);
+	sem_init(&sem_jpg,0,1);
+}
+
+void camera_test(void)
+{
+	ppm_settings.push_back(CV_IMWRITE_PXM_BINARY);
+	ppm_settings.push_back(1);
+	jpg_settings.push_back(CV_IMWRITE_JPEG_QUALITY);
+	ppm_settings.push_back(1);
+	VideoCapture camera(0);
+	camera >> frame;	
+	imwrite("test.ppm",frame);
+	camera.release();
 }
 
 /***********************************************************************
@@ -441,8 +476,6 @@ int main(int argc, char** argv)
 {
 	uint8_t i=0;
 	clock_gettime(CLOCK_REALTIME,&code_start_time);
-	//cvSetCaptureProperty(camera, CV_CAP_PROP_FRAME_WIDTH, HRES);
-	//cvSetCaptureProperty(camera, CV_CAP_PROP_FRAME_HEIGHT, VRES);
 	struct_settings();
 	func_props[0].function_pointer = func_1; 
 	func_props[1].function_pointer = func_2; 
@@ -451,6 +484,7 @@ int main(int argc, char** argv)
 	func_props[4].function_pointer = func_5;
 	func_props[5].function_pointer = func_6;
 	func_props[6].function_pointer = func_7;
+	camera_test();
 	for(i=0;i<TOTAL_THREADS;i++)
 	{
 		thread_create(&func_props[i]);
@@ -460,7 +494,6 @@ int main(int argc, char** argv)
 	{
 		thread_join(&func_props[i]);
 	}
-	cvReleaseCapture(&camera);
 	clock_gettime(CLOCK_REALTIME,&code_end_time); 
 	delta_t(&code_end_time, &code_start_time, &code_execution_time);
 	cout<<"\n\nCode Execution Time = "<<code_execution_time.tv_sec<<" seconds "<<code_execution_time.tv_nsec<<" nano seconds.\n";
