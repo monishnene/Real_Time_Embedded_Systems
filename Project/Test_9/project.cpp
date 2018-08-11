@@ -37,7 +37,7 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 500
+#define TOTAL_CAPTURES 10
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define SCHEDULER_FREQ 30
 #define True 1
@@ -273,8 +273,6 @@ void thread_join(thread_properties* struct_pointer)
 void image_capture(void)
 {
 	sem_wait(&sem_capture);
-	sem_wait(&sem_ppm_done);
-	sem_wait(&sem_jpg_done);
 	camera >> frame;
 	sem_post(&sem_capture);
 }
@@ -299,9 +297,11 @@ void  save_ppm(uint32_t count)
 void save_jpg(uint32_t count)
 {
 	sem_wait(&sem_jpg);
-	Mat frame_jpg(VRES,HRES,CV_8UC3);
-	frame_jpg = frame;
+	sem_wait(&sem_ppm_done);
 	ostringstream file_name;
+	file_name.str("");	
+	file_name<<"frame_"<<count<<".ppm";
+	Mat frame_jpg = imread(file_name.str(),CV_LOAD_IMAGE_COLOR);
 	file_name.str("");	
 	file_name<<"frame_"<<count<<".jpg";
 	imwrite(file_name.str(),frame_jpg,jpg_settings);
@@ -471,8 +471,8 @@ void sem_settings(void)
 	sem_init(&sem_capture,0,1);
 	sem_init(&sem_ppm,0,1);
 	sem_init(&sem_jpg,0,1);
-	sem_init(&sem_jpg_done,0,1);
-	sem_init(&sem_ppm_done,0,1);
+	sem_init(&sem_jpg_done,0,0);
+	sem_init(&sem_ppm_done,0,0);
 }
 
 void camera_test(void)
