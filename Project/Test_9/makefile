@@ -20,7 +20,8 @@
 
 .PHONY:	compile-all \
 	clean \
-	build 
+	build \
+	video
 
 build:	project.elf	
 
@@ -49,3 +50,6 @@ compile-all:	$(objects)
 
 clean :
 	rm	-f	*.o	*.s	*.i	*.o	*.d	*.elf *.swp	*.ppm	*.jpg	*.out
+
+video :
+	ffmpeg	-r	30	-start_number	0	-i	frame_%d.ppm	-vframes	10	-c:v	libx264	timelapse.mp4

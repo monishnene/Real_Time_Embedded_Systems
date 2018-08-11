@@ -58,6 +58,9 @@ sem_t sem_jpg;
 sem_t sem_jpg_done;
 sem_t sem_ppm_done;
 
+time_t raw_time;
+struct tm* time_info;
+
 vector<int> ppm_settings;
 vector<int> jpg_settings;
 Mat frame(VRES,HRES,CV_8UC3);
@@ -283,8 +286,11 @@ void  save_ppm(uint32_t count)
 	frame_ppm = frame;
 	ostringstream file_name;
 	file_name.str("");	
-	file_name<<count<<".ppm";
-	putText(frame_ppm,"Monish",Point(480,470),FONT_HERSHEY_COMPLEX_SMALL,0.5,Scalar(0,128,255),1);
+	file_name<<"frame_"<<count<<".ppm";
+	time(&raw_time);
+	time_info = localtime(&raw_time);
+	putText(frame_ppm,"Monish",Point(5,470),FONT_HERSHEY_SCRIPT_COMPLEX,0.5,Scalar(0,255,128),1);
+	putText(frame_ppm,asctime(time_info),Point(470,470),FONT_HERSHEY_COMPLEX_SMALL,0.5,Scalar(0,128,255),1);
 	imwrite(file_name.str(),frame_ppm,ppm_settings);
 	sem_post(&sem_ppm_done);
 	sem_post(&sem_ppm);
@@ -297,7 +303,7 @@ void save_jpg(uint32_t count)
 	frame_jpg = frame;
 	ostringstream file_name;
 	file_name.str("");	
-	file_name<<count<<".jpg";
+	file_name<<"frame_"<<count<<".jpg";
 	imwrite(file_name.str(),frame_jpg,jpg_settings);
 	sem_post(&sem_jpg_done);
 	sem_post(&sem_jpg);
