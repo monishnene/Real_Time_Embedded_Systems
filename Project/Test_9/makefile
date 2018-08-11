@@ -52,4 +52,4 @@ clean :
 	rm	-f	*.o	*.s	*.i	*.o	*.d	*.elf *.swp	*.ppm	*.jpg	*.out
 
 video :
-	ffmpeg	-framerate	25	-r	1	-pattern_type	glob	-i	'frame_*.ppm'	-c:v	libx264	timelapse.avi
+	ffmpeg	-framerate	1	-r	1	-pattern_type	glob	-i	'frame_*.ppm'	-c:v	libx264	timelapse.avi
