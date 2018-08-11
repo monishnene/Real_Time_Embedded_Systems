@@ -22,6 +22,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <mqueue.h>
+#include <fstream>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/opencv.hpp>
@@ -49,13 +50,14 @@ using namespace std;
 
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
-static uint8_t thread_frequency_array[TOTAL_THREADS]={0,1,1,1,0,0,0};
+static uint8_t thread_frequency_array[TOTAL_THREADS]={0,1,1,1,1,0,0};
 
 sem_t sem_print_time_logs;
 sem_t sem_capture;
 sem_t sem_ppm;
 sem_t sem_jpg;
-sem_t sem_jpg_done;
+sem_t sem_header;
+sem_t sem_header_start;
 sem_t sem_ppm_done;
 
 time_t raw_time;
@@ -95,7 +97,7 @@ uint8_t title_1[]="\nSequencer\n";
 uint8_t title_2[]="\nCapture image.\n";
 uint8_t title_3[]="\nSave PPM image.\n";
 uint8_t title_4[]="\nJPEG compression of PPM image\n";
-uint8_t title_5[]="\nSquirtle\n";
+uint8_t title_5[]="\nPPM Header edit\n";
 uint8_t title_6[]="\nPrimeape\n";
 uint8_t title_7[]="\nSnorlax\n";
 
@@ -291,6 +293,7 @@ void  save_ppm(uint32_t count)
 	putText(frame_ppm,asctime(time_info),Point(470,470),FONT_HERSHEY_COMPLEX_SMALL,0.5,Scalar(0,128,255),1);
 	imwrite(file_name.str(),frame_ppm,ppm_settings);
 	sem_post(&sem_ppm_done);
+	sem_post(&sem_header_start);
 	sem_post(&sem_ppm);
 }
 
@@ -305,8 +308,27 @@ void save_jpg(uint32_t count)
 	file_name.str("");	
 	file_name<<"frame_"<<count<<".jpg";
 	imwrite(file_name.str(),frame_jpg,jpg_settings);
-	sem_post(&sem_jpg_done);
 	sem_post(&sem_jpg);
+}
+
+void header_edit(uint32_t count)
+{
+	sem_wait(&sem_header);
+	sem_wait(&sem_header_start);
+	fstream file,out_file,system_stamp;
+	ostringstream file_name,out_file_name;
+	file_name.str("");
+	out_file_name.str("");	
+	file_name<<"frame_"<<count<<".ppm";
+	out_file_name<<"out_"<<count<<".ppm";
+   	file.open(file_name.str(), ios::in | ios::out);
+	out_file.open(out_file_name.str(), ios::out);
+     	system_stamp.open("system_version.out", ios::in);
+      	out_file << "P6" << endl << "#Time Stamp: " << asctime(time_info) << "#System: " << system_stamp.rdbuf() << endl << "#" << file.rdbuf();
+	out_file.close();
+	file.close();
+      	system_stamp.close();
+	sem_post(&sem_header);
 }
 
 void* func_1(void* ptr)
@@ -346,8 +368,7 @@ void* func_1(void* ptr)
 					}
 				}
 			}
-		}		
-		sem_post(&(func_props[0].sem));		
+		}	
 	}
 	for(j=1;j<TOTAL_THREADS;j++)
 	{
@@ -410,6 +431,7 @@ void* func_5(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
+			header_edit(func_props[func_id].counter);
 			function_end(func_id);
 		}	
 	}
@@ -471,7 +493,8 @@ void sem_settings(void)
 	sem_init(&sem_capture,0,1);
 	sem_init(&sem_ppm,0,1);
 	sem_init(&sem_jpg,0,1);
-	sem_init(&sem_jpg_done,0,0);
+	sem_init(&sem_header,0,1);
+	sem_init(&sem_header_start,0,0);
 	sem_init(&sem_ppm_done,0,0);
 }
 
