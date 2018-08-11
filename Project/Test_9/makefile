@@ -52,4 +52,4 @@ clean :
 	rm	-f	*.o	*.s	*.i	*.o	*.d	*.elf *.swp	*.ppm	*.jpg	*.out
 
 video :
-	ffmpeg	-r	30	-start_number	0	-i	frame_%d.ppm	-vframes	10	-c:v	libx264	timelapse.mp4
+	ffmpeg	-r	1	-pattern_type	glob	-i	'frame_*.ppm'	-c:v	libx264	timelapse.avi
