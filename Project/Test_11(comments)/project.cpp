@@ -38,7 +38,7 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 10
+#define TOTAL_CAPTURES 180
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define SCHEDULER_FREQ 30
 #define True 1
@@ -325,7 +325,7 @@ void  save_ppm(uint32_t count)
 	frame_ppm = frame;
 	ostringstream file_name;
 	file_name.str("");
-	file_name<<"frame_"<<count<<".ppm";
+	file_name<<"frame_"<<count<<"x.ppm";
 	time(&raw_time);
 	time_info = localtime(&raw_time);
 	putText(frame_ppm,"Monish",Point(5,470),FONT_HERSHEY_SCRIPT_COMPLEX,0.5,Scalar(0,255,128),1);
@@ -347,13 +347,24 @@ void save_jpg(uint32_t count)
 	sem_wait(&sem_ppm_done);
 	ostringstream file_name;
 	file_name.str("");
-	file_name<<"frame_"<<count<<".ppm";
+	file_name<<"frame_"<<count<<"x.ppm";
 	Mat frame_jpg = imread(file_name.str(),CV_LOAD_IMAGE_COLOR);
 	file_name.str("");
 	file_name<<"frame_"<<count<<".jpg";
 	imwrite(file_name.str(),frame_jpg,jpg_settings);
 	sem_post(&sem_jpg);
 }
+
+
+/***********************************************************************
+  * @brief save_jpg()
+  * Delete unnecessary ppm files.
+  ***********************************************************************/
+void delete_files(void)
+{
+	system("rm -f *x.ppm");
+}
+
 
 /***********************************************************************
   * @brief header_edit()
@@ -368,7 +379,7 @@ void header_edit(uint32_t count)
 	ostringstream file_name,out_file_name;
 	file_name.str("");
 	out_file_name.str("");
-	file_name<<"frame_"<<count<<".ppm";
+	file_name<<"frame_"<<count<<"x.ppm";
 	out_file_name<<"out_"<<count<<".ppm";
    	file.open(file_name.str(), ios::in | ios::out);
 	out_file.open(out_file_name.str(), ios::out);
@@ -525,6 +536,7 @@ void* func_6(void* ptr)
 		function_beginning(func_id);
 		if(!func_props[func_id].exit_condition)
 		{
+			delete_files();
 			function_end(func_id);
 		}
 	}
@@ -600,7 +612,7 @@ void camera_test(void)
 	ppm_settings.push_back(1);
 	camera.open(False);
 	camera >> frame;
-	imwrite("test.ppm",frame);
+	imwrite("testx.ppm",frame);
 }
 
 /***********************************************************************
