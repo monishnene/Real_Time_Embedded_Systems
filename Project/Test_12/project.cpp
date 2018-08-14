@@ -178,8 +178,9 @@ void jitter_difference_end(thread_properties * timeptr)
   	struct timespec delta_2_time;
 	double prev_average_difference = 0;
 	clock_gettime(CLOCK_REALTIME, &(timeptr->stop_ms));
+	delta_t(&(timeptr->stop_ms), &code_start_time, &(timeptr->delta_time));
 	delta_t(&(timeptr->stop_ms), &(timeptr->start_ms), &delta_2_time);
-	timeptr->difference_ms = double(delta_2_time.tv_sec*NSEC_PER_SEC - delta_2_time.tv_nsec);
+	timeptr->difference_ms = double(delta_2_time.tv_sec*NSEC_PER_SEC + delta_2_time.tv_nsec);
 	if(timeptr->WCET_ms < timeptr->difference_ms)
 	{
 		timeptr->WCET_ms = timeptr->difference_ms;
