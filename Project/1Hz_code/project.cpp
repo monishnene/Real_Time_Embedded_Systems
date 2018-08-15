@@ -13,6 +13,7 @@
 #include <iostream>
 #include <time.h>
 #include <stdbool.h>
+#include <syslog.h>
 
 #include <sys/param.h>
 #include <sys/msg.h>
@@ -38,7 +39,7 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 7
-#define TOTAL_CAPTURES 180
+#define TOTAL_CAPTURES 10
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define SCHEDULER_FREQ 30
 #define True 1
@@ -48,6 +49,7 @@ using namespace std;
 #define VRES 480
 #define HRES 640
 #define TOTAL_CPUS 4
+#define SYSLOG_PRIORITY (MAX_PRIORITY-TOTAL_THREADS)
 
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
@@ -158,6 +160,70 @@ void delta_t(struct timespec *stop, struct timespec *start, struct timespec *del
 }
 
 /***********************************************************************
+ * @brief number string()
+ * This function is used to convert number to string
+ * @param number to be printed
+ * @param display_width number of digits to be displayed
+ * @param str pointer to store output str
+***********************************************************************/
+void number_string(int32_t number,uint8_t display_width,uint8_t* str)
+{
+	uint8_t temp_data[10];
+    	uint8_t* temp_str=temp_data;
+	int8_t counter=0;
+	uint32_t value_check=0;
+    	for(counter=display_width;counter>1;counter--)
+    	{
+        	switch(counter)
+        	{
+            		case 4:
+            		{
+                		value_check = 999;
+                		if(number<=value_check)
+                		{
+                    			*(str++) = '0';
+                		}
+                		break;
+            		}
+
+            		case 3:
+            		{
+                		value_check = 99;
+                		if(number<=value_check)
+                		{
+                    			*(str++) = '0';
+                		}
+                		break;
+            		}
+
+            		case 2:
+            		{
+                		value_check = 9;
+                		if(number<=value_check)
+                		{
+                   	 		*(str++) = '0';
+                		}
+                		break;
+            		}
+        	}
+	}
+	counter=0;
+	do
+	{
+		*(++temp_str)='0'+ number%10;
+		number/=10;
+		counter++;
+	}while(number>0);
+	for(;counter>0;counter--)
+	{
+		*(str++) = *(temp_str--);
+	}
+	*(str)=0;
+	return;
+}
+
+
+/***********************************************************************
   * @brief jitter_difference_start()
   * Measure start time of a thread
   * @param measured_time * timeptr pointer to thread time structure
@@ -206,15 +272,15 @@ void jitter_difference_end(thread_properties * timeptr)
 void print_time_logs(thread_properties * timeptr)
 {
 	sem_wait(&sem_print_time_logs);
-	cout<<timeptr->title;
-	printf("Time since start of code = %ld seconds %ld nanoseconds\n",timeptr->delta_time.tv_sec,timeptr->delta_time.tv_nsec);
-	printf("Thread %d Frequency = %d Hz\n",timeptr->thread_id,timeptr->times_exe_per_sec);
-	printf("Thread %d starts at %f ns\n",timeptr->thread_id,timeptr->start_ms);
-	printf("Thread %d stops  at %f ns\n",timeptr->thread_id,timeptr->stop_ms);
-	printf("Thread %d average execution time %f ns\n",timeptr->thread_id,timeptr->average_difference_ms);
-	printf("Thread %d worst case execution time %f ns\n",timeptr->thread_id,timeptr->WCET_ms);
-	printf("Thread %d accumulated jitter %f ns\n",timeptr->thread_id,timeptr->accumulated_jitter_ms);
-	printf("Thread %d average jitter %f ns\n",timeptr->thread_id,timeptr->average_jitter_ms);
+	syslog(SYSLOG_PRIORITY,"%s",timeptr->title);
+	syslog(SYSLOG_PRIORITY,"Time since start of code = %ld seconds %ld nanoseconds\n",timeptr->delta_time.tv_sec,timeptr->delta_time.tv_nsec);
+	syslog(SYSLOG_PRIORITY,"Thread %d Frequency = %d Hz\n",timeptr->thread_id,timeptr->times_exe_per_sec);
+	syslog(SYSLOG_PRIORITY,"Thread %d starts at %f ns\n",timeptr->thread_id,timeptr->start_ms);
+	syslog(SYSLOG_PRIORITY,"Thread %d stops  at %f ns\n",timeptr->thread_id,timeptr->stop_ms);
+	syslog(SYSLOG_PRIORITY,"Thread %d average execution time %f ns\n",timeptr->thread_id,timeptr->average_difference_ms);
+	syslog(SYSLOG_PRIORITY,"Thread %d worst case execution time %f ns\n",timeptr->thread_id,timeptr->WCET_ms);
+	syslog(SYSLOG_PRIORITY,"Thread %d accumulated jitter %f ns\n",timeptr->thread_id,timeptr->accumulated_jitter_ms);
+	syslog(SYSLOG_PRIORITY,"Thread %d average jitter %f ns\n",timeptr->thread_id,timeptr->average_jitter_ms);
 	sem_post(&sem_print_time_logs);
 }
 
@@ -280,11 +346,11 @@ void thread_create(thread_properties* struct_pointer)
 	pthread_attr_setschedparam(&(struct_pointer->attribute), &(struct_pointer->parameter));
 	if(pthread_create(&(struct_pointer->thread), &(struct_pointer->attribute), struct_pointer->function_pointer, NULL)==0)
     {
-        printf("thread %d created\n\r",struct_pointer->thread_id);
+        syslog(SYSLOG_PRIORITY,"thread %d created\n\r",struct_pointer->thread_id);
     }
     else
     {
-        printf("thread %d creation failed\n\r",struct_pointer->thread_id);
+        syslog(SYSLOG_PRIORITY,"thread %d creation failed\n\r",struct_pointer->thread_id);
     }
 }
 
@@ -320,9 +386,11 @@ void  save_ppm(uint32_t count)
 	sem_wait(&sem_ppm);
 	Mat frame_ppm(VRES,HRES,CV_8UC3);
 	frame_ppm = frame;
+	uint8_t str[10];
 	ostringstream file_name;
+	number_string(count,4,str);
 	file_name.str("");
-	file_name<<"frame_"<<count<<"x.ppm";
+	file_name<<"frame_"<<str<<"x.ppm";
 	time(&raw_time);
 	time_info = localtime(&raw_time);
 	putText(frame_ppm,"Monish",Point(5,470),FONT_HERSHEY_SCRIPT_COMPLEX,0.5,Scalar(0,255,128),1);
@@ -342,12 +410,14 @@ void save_jpg(uint32_t count)
 {
 	sem_wait(&sem_jpg);
 	sem_wait(&sem_ppm_done);
+	uint8_t str[10];
 	ostringstream file_name;
+	number_string(count,4,str);
 	file_name.str("");
-	file_name<<"frame_"<<count<<"x.ppm";
+	file_name<<"frame_"<<str<<"x.ppm";
 	Mat frame_jpg = imread(file_name.str(),CV_LOAD_IMAGE_COLOR);
 	file_name.str("");
-	file_name<<"frame_"<<count<<".jpg";
+	file_name<<"frame_"<<str<<".jpg";
 	imwrite(file_name.str(),frame_jpg,jpg_settings);
 	sem_post(&sem_jpg);
 }
@@ -362,12 +432,14 @@ void header_edit(uint32_t count)
 {
 	sem_wait(&sem_header);
 	sem_wait(&sem_header_start);
+	uint8_t str[10];
+	number_string(count,4,str);
 	fstream file,out_file,system_stamp;
 	ostringstream file_name,out_file_name;
 	file_name.str("");
 	out_file_name.str("");
-	file_name<<"frame_"<<count<<"x.ppm";
-	out_file_name<<"out_"<<count<<".ppm";
+	file_name<<"frame_"<<str<<"x.ppm";
+	out_file_name<<"out_"<<str<<".ppm";
    	file.open(file_name.str(), ios::in | ios::out);
 	out_file.open(out_file_name.str(), ios::out);
      	system_stamp.open("system_version.out", ios::in);
@@ -627,5 +699,5 @@ int main(int argc, char** argv)
 	camera.release();
 	clock_gettime(CLOCK_REALTIME,&code_end_time);
 	delta_t(&code_end_time, &code_start_time, &code_execution_time);
-	cout<<"\n\nCode Execution Time = "<<code_execution_time.tv_sec<<" seconds "<<code_execution_time.tv_nsec<<" nano seconds.\n";
+	syslog(SYSLOG_PRIORITY,"\nCode Execution Time = %ld seconds %ld nanoseconds\n",code_execution_time.tv_sec,code_execution_time.tv_nsec);
 }

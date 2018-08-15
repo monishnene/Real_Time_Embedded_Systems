@@ -55,4 +55,4 @@ del :
 	rm	-f	*.ppm	*.jpg	*.avi	*.mp4
 
 video :
-	ffmpeg	-framerate	1	-r	1	-pattern_type	glob	-i	'frame_*.ppm'	-c:v	libx264	timelapse.avi
+	ffmpeg	-start_number 0 -i frame_%4d.ppm -vframes 180 -vcodec mpeg4 output.mp4

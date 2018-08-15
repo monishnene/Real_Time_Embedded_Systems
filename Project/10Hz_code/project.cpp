@@ -38,7 +38,7 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 3
-#define TOTAL_CAPTURES 1800
+#define TOTAL_CAPTURES 10
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define SCHEDULER_FREQ 3
 #define FREQUENCY 10
@@ -105,6 +105,78 @@ void loop_condition_check(void);
 void thread_create(thread_properties* struct_pointer);
 void thread_join(thread_properties* struct_pointer);
 
+/***********************************************************************
+ * @brief number string()
+ * This function is used to convert number to string
+ * @param number to be printed
+ * @param display_width number of digits to be displayed
+ * @param str pointer to store output str
+***********************************************************************/
+void number_string(int32_t number,uint8_t display_width,uint8_t* str)
+{
+	uint8_t temp_data[10];
+    	uint8_t* temp_str=temp_data;
+	int8_t counter=0;
+	uint32_t value_check=0;
+    	for(counter=display_width;counter>1;counter--)
+    	{
+        	switch(counter)
+        	{
+            		case 4:
+            		{
+                		value_check = 999;
+                		if(number<=value_check)
+                		{
+                    			*(str++) = '0';
+                		}
+                		break;
+            		}
+
+            		case 3:
+            		{
+                		value_check = 99;
+                		if(number<=value_check)
+                		{
+                    			*(str++) = '0';
+                		}
+                		break;
+            		}
+
+            		case 2:
+            		{
+                		value_check = 9;
+                		if(number<=value_check)
+                		{
+                   	 		*(str++) = '0';
+                		}
+                		break;
+            		}
+        	}
+	}
+	counter=0;
+	do
+	{
+		*(++temp_str)='0'+ number%10;
+		number/=10;
+		counter++;
+	}while(number>0);
+	for(;counter>0;counter--)
+	{
+		*(str++) = *(temp_str--);
+	}
+	*(str)=0;
+	return;
+}
+
+
+/***********************************************************************
+  * @brief delta_t()
+  * Find the difference between two timespec structures eg a - b =c
+  * @param struct timespec *stop (a)
+  * @param struct timespec *start (b)
+  * @param struct timespec *delta_t (c)
+  * @return success or fail
+  ***********************************************************************/
 void delta_t(struct timespec *stop, struct timespec *start, struct timespec *delta_t)
 {
   int dt_sec=stop->tv_sec - start->tv_sec;
@@ -139,19 +211,32 @@ void delta_t(struct timespec *stop, struct timespec *start, struct timespec *del
   return;
 }
 
-
+/***********************************************************************
+  * @brief function_end()
+  * Code to be executed at the end of all sequencer functions
+  * @param func_id array index of the function that called this function
+  ***********************************************************************/
 void function_end(uint8_t func_id)
 {
 	func_props[func_id].counter++;
 	return;
 }
 
+/***********************************************************************
+  * @brief function_beginning()
+  * Code to be executed at the beginning of all sequencer functions
+  * @param func_id array index of the function that called this function
+  ***********************************************************************/
 void function_beginning(uint8_t func_id)
 {
 	sem_wait(&(func_props[func_id].sem));		
 	return;
 }
 
+/***********************************************************************
+  * @brief loop_condition_check()
+  * Check frames captured and exit loop if Total frames captured
+  ***********************************************************************/
 void loop_condition_check(void)
 {
 	static uint32_t iterations=0;
@@ -162,6 +247,11 @@ void loop_condition_check(void)
 	return;
 }	
 
+/***********************************************************************
+  * @brief thread_create()
+  * create threads according to thread properties.
+  * param struct_pointer for the thread properties for thread to be created.
+  ***********************************************************************/
 void thread_create(thread_properties* struct_pointer)
 {	
 	pthread_attr_init(&(struct_pointer->attribute));
@@ -175,11 +265,20 @@ void thread_create(thread_properties* struct_pointer)
   	else printf("thread %d creation failed\n\r",struct_pointer->thread_id);
 } 
 
+/***********************************************************************
+  * @brief thread_join()
+  * join threads according to thread properties.
+  * @param struct_pointer for the thread properties for thread to be joined.
+  ***********************************************************************/
 void thread_join(thread_properties* struct_pointer)
 {
 	pthread_join(struct_pointer->thread,NULL);
 }
 
+/***********************************************************************
+  * @brief image_capture()
+  * Capture a Mat frame from the camera.
+  ***********************************************************************/
 void image_capture(void)
 {
 	sem_wait(&sem_capture);
@@ -188,16 +287,28 @@ void image_capture(void)
 	sem_post(&sem_capture);
 }
 
+/***********************************************************************
+  * @brief save_ppm()
+  * Save a frame in ppm format.
+  * @param count of the frame to be saved.
+  ***********************************************************************/
 void  save_ppm(uint32_t count)
 {
+	uint8_t str[10];
+	number_string(count,4,str);
 	sem_wait(&sem_ppm);
 	sem_wait(&sem_capture_done);
 	file_name.str("");	
-	file_name<<"frame_"<<count<<".ppm";
+	file_name<<"frame_"<<str<<".ppm";
 	imwrite(file_name.str(),frame,ppm_settings);
 	sem_post(&sem_ppm);
 }
 
+/***********************************************************************
+  * @brief func_1()
+  * Sequencer thread. sequences other threads according to requirement.
+  * @param ptr pointer to be used to update data modified in the thread.
+  ***********************************************************************/
 void* func_1(void* ptr)
 {
 	uint8_t func_id=0,i=0,j=0;
@@ -240,6 +351,11 @@ void* func_1(void* ptr)
 	pthread_exit(NULL);
 }
 
+/***********************************************************************
+  * @brief func_2()
+  * Thread function to be used according to requirement.
+  * @param ptr pointer to be used to update data modified in the thread.
+  ***********************************************************************/
 void* func_2(void* ptr)
 {
 	uint8_t func_id=1;
@@ -255,6 +371,11 @@ void* func_2(void* ptr)
 	pthread_exit(NULL);
 }
 
+/***********************************************************************
+  * @brief func_3()
+  * Thread function to be used according to requirement.
+  * @param ptr pointer to be used to update data modified in the thread.
+  ***********************************************************************/
 void* func_3(void* ptr)
 {
 	uint8_t func_id=2;
@@ -270,6 +391,10 @@ void* func_3(void* ptr)
 	pthread_exit(NULL);
 }
 
+/***********************************************************************
+  * @brief struct_settings()
+  * Set up structure properties required by the code.
+  ***********************************************************************/
 void struct_settings(void)
 {
 	func_props[0].function_pointer = func_1; 
@@ -277,6 +402,10 @@ void struct_settings(void)
 	func_props[2].function_pointer = func_3; 
 }
 
+/***********************************************************************
+  * @brief sem_settings()
+  * Set up semaphores required in the code.
+  ***********************************************************************/
 void sem_settings(void)
 {
 	sem_init(&sem_capture,0,1);
@@ -284,6 +413,10 @@ void sem_settings(void)
 	sem_init(&sem_ppm,0,1);
 }
 
+/***********************************************************************
+  * @brief camera_test()
+  * Test if camera is acquired properly.
+  ***********************************************************************/
 void camera_test(void)
 {
 	ppm_settings.push_back(CV_IMWRITE_PXM_BINARY);
