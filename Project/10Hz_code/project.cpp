@@ -13,6 +13,7 @@
 #include <iostream>
 #include <time.h>
 #include <stdbool.h>
+#include <syslog.h>
 
 #include <sys/param.h>
 #include <sys/msg.h>
@@ -38,7 +39,7 @@ using namespace std;
 #define NSEC_PER_SEC 1000000000
 #define NSEC_PER_MSEC 1000000
 #define TOTAL_THREADS 3
-#define TOTAL_CAPTURES 10
+#define TOTAL_CAPTURES 1800
 #define THREADS_POST_TIME (1*NSEC_PER_MSEC)
 #define SCHEDULER_FREQ 3
 #define FREQUENCY 10
@@ -48,6 +49,7 @@ using namespace std;
 #define OFF 1
 #define VRES 480
 #define HRES 640
+#define SYSLOG_PRIORITY (MAX_PRIORITY-TOTAL_THREADS)
 
 static uint32_t seconds_since_start=0;
 static uint8_t thread_count=0,error=0,loop_condition=True;
@@ -261,8 +263,13 @@ void thread_create(thread_properties* struct_pointer)
 	sem_init(&(struct_pointer->sem),0,0);
 	pthread_attr_setschedparam(&(struct_pointer->attribute), &(struct_pointer->parameter));
 	if(pthread_create(&(struct_pointer->thread), &(struct_pointer->attribute), struct_pointer->function_pointer, NULL)==0)
-		printf("thread %d created\n\r",struct_pointer->thread_id);
-  	else printf("thread %d creation failed\n\r",struct_pointer->thread_id);
+	{
+        	syslog(SYSLOG_PRIORITY,"thread %d created\n\r",struct_pointer->thread_id);
+    	}
+    	else
+    	{
+        	syslog(SYSLOG_PRIORITY,"thread %d creation failed\n\r",struct_pointer->thread_id);
+    	}
 } 
 
 /***********************************************************************
@@ -454,5 +461,5 @@ int main(int argc, char** argv)
 	camera.release();
 	clock_gettime(CLOCK_REALTIME,&code_end_time); 
 	delta_t(&code_end_time, &code_start_time, &code_execution_time);
-	cout<<"\n\nCode Execution Time = "<<code_execution_time.tv_sec<<" seconds "<<code_execution_time.tv_nsec<<" nano seconds.\n";
+	syslog(SYSLOG_PRIORITY,"\nCode Execution Time = %ld seconds %ld nanoseconds\n",code_execution_time.tv_sec,code_execution_time.tv_nsec);
 }

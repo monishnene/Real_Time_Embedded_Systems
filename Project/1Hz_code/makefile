@@ -55,4 +55,4 @@ del :
 	rm	-f	*.ppm	*.jpg	
 
 video :
-	ffmpeg	-start_number 0 -i out_%4d.ppm -vframes 180 -vcodec mpeg4 output.mp4
+	ffmpeg	-start_number 0 -i out_%4d.ppm -vframes 180 -vcodec mpeg4 output_demo.mp4

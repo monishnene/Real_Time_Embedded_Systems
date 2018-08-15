@@ -55,4 +55,4 @@ del :
 	rm	-f	*.ppm	*.jpg	*.avi	*.mp4
 
 video :
-	ffmpeg	-start_number 0 -i frame_%4d.ppm -vframes 180 -vcodec mpeg4 output.mp4
+	ffmpeg	-start_number 0 -i frame_%4d.ppm -vframes 1800 -vcodec mpeg4 output_demo_10hz.mp4
